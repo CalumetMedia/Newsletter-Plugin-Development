@@ -358,7 +358,9 @@ $('#send-to-mailchimp').click(function(e) {
         data: {
             action: 'create_mailchimp_campaign',
             security: newsletterData.nonceMailchimp,
-            newsletter_slug: newsletterData.newsletterSlug
+            newsletter_slug: newsletterData.newsletterSlug,
+            subject_line: $('#subject_line').val(),
+            campaign_name: $('#campaign_name').val()
         },
         success: function(response) {
             if (response.success) {

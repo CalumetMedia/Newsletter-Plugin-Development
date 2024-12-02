@@ -82,12 +82,6 @@ if (empty($newsletter_name)) {
     return;
 }
 
-// Retrieve existing custom header and footer options
-//$custom_header        = get_option("newsletter_custom_header_$newsletter_slug", '');
-//$custom_footer        = get_option("newsletter_custom_footer_$newsletter_slug", '');
-//$enable_custom_header = get_option("newsletter_enable_custom_header_$newsletter_slug", 0);
-//$enable_custom_footer = get_option("newsletter_enable_custom_footer_$newsletter_slug", 0);
-
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['blocks_nonce'])) {
     if (!wp_verify_nonce($_POST['blocks_nonce'], 'save_blocks_action')) {
@@ -97,10 +91,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['blocks_nonce'])) {
     newsletter_handle_blocks_form_submission_non_ajax($newsletter_slug);
 
     // Save custom header and footer
-    //update_option("newsletter_custom_header_$newsletter_slug", wp_kses_post($_POST['custom_header']));
-    //update_option("newsletter_custom_footer_$newsletter_slug", wp_kses_post($_POST['custom_footer']));
-    //update_option("newsletter_enable_custom_header_$newsletter_slug", isset($_POST['enable_custom_header']) ? 1 : 0);
-    //update_option("newsletter_enable_custom_footer_$newsletter_slug", isset($_POST['enable_custom_footer']) ? 1 : 0);
+    // Uncomment and adjust the following lines if you wish to handle custom header/footer
+    // update_option("newsletter_custom_header_$newsletter_slug", wp_kses_post($_POST['custom_header']));
+    // update_option("newsletter_custom_footer_$newsletter_slug", wp_kses_post($_POST['custom_footer']));
+    // update_option("newsletter_enable_custom_header_$newsletter_slug", isset($_POST['enable_custom_header']) ? 1 : 0);
+    // update_option("newsletter_enable_custom_footer_$newsletter_slug", isset($_POST['enable_custom_footer']) ? 1 : 0));
+
 
     // Redirect to avoid form resubmission
     wp_redirect(add_query_arg(['page' => 'newsletter-stories', 'newsletter_slug' => $newsletter_slug, 'message' => 'blocks_saved'], admin_url('admin.php')));
@@ -167,11 +163,8 @@ wp_localize_script('newsletter-admin-js', 'newsletterData', array(
     'categories'           => $categories_data,
     'availableTemplates'   => $templates_data, // Pass templates as array of objects
     'templateLabel'        => __('Template:', 'newsletter'),
-    'nonceMailchimp' => wp_create_nonce('mailchimp_campaign_nonce'),
+    'nonceMailchimp'       => wp_create_nonce('mailchimp_campaign_nonce'),
 ));
-
-// Retrieve the current newsletter slug from URL parameters
-// The following part is already done above, no need to repeat
 
 ?>
 <div class="wrap">
@@ -198,22 +191,37 @@ wp_localize_script('newsletter-admin-js', 'newsletterData', array(
                     <input type="date" id="end_date" name="end_date" value="<?php echo isset($_POST['end_date']) ? esc_attr($_POST['end_date']) : ''; ?>" />
                 </div>
 
-                <!-- Custom Header and Footer -->
-                <!-- <div class="settings-box">
-                    <h2><?php esc_html_e('Custom Header and Footer', 'newsletter'); ?></h2>
+                <!-- Button Group: Moved between Date Range and Blocks -->
+                <div class="button-group" style="display: flex; justify-content: flex-start; gap: 15px; margin: 20px 0;">
+                    <button type="button" class="button button-large" id="add-block" style="padding: 10px 20px; font-size: 16px;">
+                        <?php esc_html_e('Add Block', 'newsletter'); ?>
+                    </button>
+                    <button type="submit" class="button button-primary button-large" id="save-blocks" style="padding: 10px 20px; font-size: 16px;">
+                        <?php esc_html_e('Save', 'newsletter'); ?>
+                    </button>
+                    <?php if (get_option('mailchimp_api_key')) : ?>
+                        <button type="button" class="button button-secondary button-large" id="send-to-mailchimp" style="padding: 10px 20px; font-size: 16px;">
+                            <img src="<?php echo esc_url(NEWSLETTER_PLUGIN_URL . 'assets/images/mailchimp-logo.webp'); ?>"
+                                 alt="<?php esc_attr_e('Mailchimp', 'newsletter'); ?>"
+                                 style="height: 15px; vertical-align: middle; margin-right: 5px;">
+                            <?php esc_html_e('Send to Mailchimp', 'newsletter'); ?>
+                        </button>
+                    <?php endif; ?>
+                </div>
 
-                    <label>
-                        <input type="checkbox" id="enable_custom_header" name="enable_custom_header" value="1" <?php checked($enable_custom_header, 1); ?> />
-                        <?php esc_html_e('Enable Custom Header', 'newsletter'); ?>
-                    </label>
-                    <textarea id="custom_header" name="custom_header" style="width:100%; height:100px;"><?php echo esc_textarea($custom_header); ?></textarea>
-
-                    <label>
-                        <input type="checkbox" id="enable_custom_footer" name="enable_custom_footer" value="1" <?php checked($enable_custom_footer, 1); ?> />
-                        <?php esc_html_e('Enable Custom Footer', 'newsletter'); ?>
-                    </label>
-                    <textarea id="custom_footer" name="custom_footer" style="width:100%; height:100px;"><?php echo esc_textarea($custom_footer); ?></textarea>
-                </div> -->
+                <!-- **New Section: Subject Line and Campaign Name** -->
+<div class="settings-box" style="margin-bottom: 20px;">
+    <h2><?php esc_html_e('Mailchimp Settings', 'newsletter'); ?></h2>
+    <p>
+        <label for="subject_line"><?php esc_html_e('Subject Line:', 'newsletter'); ?></label><br>
+        <input type="text" id="subject_line" name="subject_line" value="<?php echo esc_attr(get_option("newsletter_subject_line_$newsletter_slug", '')); ?>" style="width:100%; padding: 8px; font-size: 14px;" />
+    </p>
+    <p>
+        <label for="campaign_name"><?php esc_html_e('Campaign Name:', 'newsletter'); ?></label><br>
+        <input type="text" id="campaign_name" name="campaign_name" value="<?php echo esc_attr(get_option("newsletter_campaign_name_$newsletter_slug", '')); ?>" style="width:100%; padding: 8px; font-size: 14px;" />
+    </p>
+</div>
+                <!-- End of New Section -->
 
                 <!-- Blocks Management -->
                 <div class="settings-box">
@@ -240,44 +248,20 @@ wp_localize_script('newsletter-admin-js', 'newsletterData', array(
                         }
                         ?>
                     </div>
-
-<div class="button-group">
-    <button type="button" class="button" id="add-block" style="margin-right: 10px;">
-        <?php esc_html_e('Add Block', 'newsletter'); ?>
-    </button>
-    <button type="submit" class="button button-primary" id="save-blocks" style="margin-right: 10px;">
-        <?php esc_html_e('Save', 'newsletter'); ?>
-    </button>
-    <?php if (get_option('mailchimp_api_key')) : ?>
-        <button type="button" class="button button-secondary" id="send-to-mailchimp" style="margin-right: 10px;">
-            <img src="<?php echo esc_url(NEWSLETTER_PLUGIN_URL . 'assets/images/mailchimp-logo.webp'); ?>"
-                 alt="<?php esc_attr_e('Mailchimp', 'newsletter'); ?>"
-                 style="height: 15px; vertical-align: middle; margin-right:5px;">
-            <?php esc_html_e('Send to Mailchimp', 'newsletter'); ?>
-        </button>
-    <?php endif; ?>
-</div>
-
                 </div>
 
-<!-- Custom Header/Footer HTML -->
-<div class="settings-box">
-    <h2><?php esc_html_e('Custom Header/Footer HTML', 'newsletter'); ?></h2>
-    
-    <div class="custom-html-section">
-        <label for="custom_header"><?php esc_html_e('Custom Header HTML:', 'newsletter'); ?></label>
-        <textarea id="custom_header" name="custom_header" rows="5" style="width:100%;"><?php echo esc_textarea(get_option("newsletter_custom_header_$newsletter_slug", '')); ?></textarea>
-        
-        <label for="custom_footer" style="margin-top: 15px; display: block;"><?php esc_html_e('Custom Footer HTML:', 'newsletter'); ?></label>
-        <textarea id="custom_footer" name="custom_footer" rows="5" style="width:100%;"><?php echo esc_textarea(get_option("newsletter_custom_footer_$newsletter_slug", '')); ?></textarea>
-    </div>
-</div>
-
-
-
-
-
-
+                <!-- Custom Header/Footer HTML -->
+                <div class="settings-box">
+                    <h2><?php esc_html_e('Custom Header/Footer HTML', 'newsletter'); ?></h2>
+                    
+                    <div class="custom-html-section">
+                        <label for="custom_header"><?php esc_html_e('Custom Header HTML:', 'newsletter'); ?></label>
+                        <textarea id="custom_header" name="custom_header" rows="5" style="width:100%;"><?php echo esc_textarea(get_option("newsletter_custom_header_$newsletter_slug", '')); ?></textarea>
+                        
+                        <label for="custom_footer" style="margin-top: 15px; display: block;"><?php esc_html_e('Custom Footer HTML:', 'newsletter'); ?></label>
+                        <textarea id="custom_footer" name="custom_footer" rows="5" style="width:100%;"><?php echo esc_textarea(get_option("newsletter_custom_footer_$newsletter_slug", '')); ?></textarea>
+                    </div>
+                </div>
 
             </form>
         </div> <!-- End of Left Column -->
@@ -298,5 +282,3 @@ wp_localize_script('newsletter-admin-js', 'newsletterData', array(
         </div> <!-- End of Right Column -->
     </div> <!-- End of Flex Container -->
 </div> <!-- End of Wrap -->
-
-

@@ -175,7 +175,40 @@ function newsletter_handle_blocks_form_submission() {
         $sanitized_blocks[] = $sanitized_block;
     }
 
+    // Save the blocks
     update_option("newsletter_blocks_$newsletter_slug", $sanitized_blocks);
+
+    // Save assigned categories
+    if (isset($_POST['assigned_categories']) && is_array($_POST['assigned_categories'])) {
+        $assigned_categories = array_map('intval', $_POST['assigned_categories']);
+        update_option("newsletter_categories_$newsletter_slug", $assigned_categories);
+    }
+
+    // Save selected template
+    if (isset($_POST['selected_template_id'])) {
+        $selected_template_id = sanitize_text_field($_POST['selected_template_id']);
+        update_option("newsletter_template_id_$newsletter_slug", $selected_template_id);
+    }
+
+    // **New Code: Save Subject Line and Campaign Name**
+    if (isset($_POST['subject_line'])) {
+        $subject_line = sanitize_text_field($_POST['subject_line']);
+        update_option("newsletter_subject_line_$newsletter_slug", $subject_line);
+    }
+
+    if (isset($_POST['campaign_name'])) {
+        $campaign_name = sanitize_text_field($_POST['campaign_name']);
+        update_option("newsletter_campaign_name_$newsletter_slug", $campaign_name);
+    }
+
+    // Save custom header/footer HTML
+    if (isset($_POST['custom_header'])) {
+        update_option("newsletter_custom_header_$newsletter_slug", wp_kses_post($_POST['custom_header']));
+    }
+    if (isset($_POST['custom_footer'])) {
+        update_option("newsletter_custom_footer_$newsletter_slug", wp_kses_post($_POST['custom_footer']));
+    }
+
     wp_send_json_success(__('Blocks have been saved.', 'newsletter'));
 }
 add_action('wp_ajax_save_newsletter_blocks', 'newsletter_handle_blocks_form_submission');
@@ -185,10 +218,8 @@ add_action('wp_ajax_save_newsletter_blocks', 'newsletter_handle_blocks_form_subm
  * AJAX Handler to Create Mailchimp Campaign
  */
 function create_mailchimp_campaign() {
-    // Verify nonce
     check_ajax_referer('mailchimp_campaign_nonce', 'security');
 
-    // Get newsletter slug
     $newsletter_slug = isset($_POST['newsletter_slug']) ? sanitize_text_field($_POST['newsletter_slug']) : '';
     if (empty($newsletter_slug)) {
         wp_send_json_error('Newsletter slug is required.');
@@ -197,29 +228,35 @@ function create_mailchimp_campaign() {
 
     // Get blocks and generate content
     $blocks = get_option("newsletter_blocks_$newsletter_slug", []);
-    $custom_header = get_option("newsletter_custom_header_$newsletter_slug", '');
-    $custom_footer = get_option("newsletter_custom_footer_$newsletter_slug", '');
-
-    // Generate full content including header, blocks, and footer
-    $content = $custom_header;
-    $content .= newsletter_generate_preview_content($newsletter_slug, $blocks);
-    $content .= $custom_footer;
+    
+    // **New Code: Retrieve Subject Line and Campaign Name**
+    $subject_line = get_option("newsletter_subject_line_$newsletter_slug", '');
+    $campaign_name = get_option("newsletter_campaign_name_$newsletter_slug", '');
+    
+    // Generate content without header/footer since it's included in newsletter_generate_preview_content
+    $content = newsletter_generate_preview_content($newsletter_slug, $blocks);
 
     try {
-        // Create campaign with full content
-        $result = np_create_campaign([
-            'newsletter_slug' => $newsletter_slug,
-            'content_html' => $content
-        ]);
+        $mailchimp = new Newsletter_Mailchimp_API();
+        
+        // **Modify create_campaign to accept subject_line and campaign_name**
+        $campaign = $mailchimp->create_campaign($newsletter_slug, $subject_line, $campaign_name);
+        
+        if (is_wp_error($campaign)) {
+            wp_send_json_error($campaign->get_error_message());
+            return;
+        }
 
-        if (is_wp_error($result)) {
-            wp_send_json_error($result->get_error_message());
+        $content_result = $mailchimp->set_campaign_content($campaign['id'], $content);
+        
+        if (is_wp_error($content_result)) {
+            wp_send_json_error($content_result->get_error_message());
             return;
         }
 
         wp_send_json_success([
-            'campaign_id' => $result['id'],
-            'web_id' => $result['web_id'],
+            'campaign_id' => $campaign['id'],
+            'web_id' => $campaign['web_id'],
             'message' => __('Campaign created successfully.', 'newsletter'),
         ]);
 

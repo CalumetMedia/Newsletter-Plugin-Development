@@ -13,7 +13,7 @@ function newsletter_setup_menu() {
         'manage_options',               // Capability
         'newsletter-settings',          // Menu slug
         'newsletter_all_settings_page', // Callback function
-        'dashicons-email-alt2',         // Icon (Dashicons envelope icon)
+        'dashicons-email-alt',         // Icon (Dashicons envelope icon)
         22                              // Position
     );
 

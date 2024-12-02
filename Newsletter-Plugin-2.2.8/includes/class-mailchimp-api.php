@@ -18,38 +18,47 @@ class Newsletter_Mailchimp_API {
         return $this->make_request('ping');
     }
 
-    public function create_campaign($newsletter_slug) {
-        $settings = $this->get_newsletter_settings($newsletter_slug);
-        if (empty($settings['from_name']) || empty($settings['reply_to'])) {
-            return new WP_Error('missing_settings', 'Missing required settings for campaign creation');
-        }
-
-        $list_id = get_option('mailchimp_list_id');
-        if (empty($list_id)) {
-            return new WP_Error('missing_list', 'Mailchimp List ID is not set');
-        }
-
-        $payload = [
-            'type' => 'regular',
-            'recipients' => [
-                'list_id' => $list_id
-            ],
-            'settings' => [
-                'subject_line' => $settings['subject'] ?: 'Newsletter ' . date('Y-m-d'),
-                'title' => $settings['subject'] ?: 'Newsletter ' . date('Y-m-d'),
-                'from_name' => $settings['from_name'],
-                'reply_to' => $settings['reply_to'],
-                'to_name' => '*|FNAME|*',
-                'folder_id' => '',
-                'authenticate' => true,
-                'auto_footer' => true,
-                'inline_css' => true
-            ]
-        ];
-
-        np_log_error('Creating campaign with payload: ' . print_r($payload, true));
-        return $this->make_request('campaigns', 'POST', $payload);
+    /**
+     * Create a new Mailchimp campaign with custom subject line and campaign name
+     *
+     * @param string $newsletter_slug
+     * @param string $subject_line
+     * @param string $campaign_name
+     * @return array|WP_Error
+     */
+public function create_campaign($newsletter_slug, $subject_line = '', $campaign_name = '') {
+    $list_id = get_option('mailchimp_list_id');
+    if (empty($list_id)) {
+        return new WP_Error('missing_list', 'Mailchimp List ID is not set.');
     }
+
+    // Get the global Mailchimp settings
+    $from_name = get_option('mailchimp_from_name');
+    $reply_to = get_option('mailchimp_reply_to');
+
+    if (empty($from_name) || empty($reply_to)) {
+        return new WP_Error('missing_settings', 'Missing required settings for campaign creation');
+    }
+
+    $payload = [
+        'type' => 'regular',
+        'recipients' => [
+            'list_id' => $list_id
+        ],
+        'settings' => [
+            'subject_line' => $subject_line ?: 'Newsletter ' . date('Y-m-d'),
+            'title' => $campaign_name ?: 'Newsletter ' . date('Y-m-d'),
+            'from_name' => $from_name,
+            'reply_to' => $reply_to,
+            'to_name' => '*|FNAME|*',
+            'authenticate' => true,
+            'auto_footer' => true,
+            'inline_css' => true
+        ]
+    ];
+
+    return $this->make_request('campaigns', 'POST', $payload);
+}
 
     public function set_campaign_content($campaign_id, $html_content) {
         if (empty($campaign_id)) {
@@ -69,11 +78,18 @@ class Newsletter_Mailchimp_API {
         return $this->make_request("campaigns/$campaign_id/actions/send", 'POST');
     }
 
+    /**
+     * Retrieve newsletter settings including subject_line and campaign_name
+     *
+     * @param string $newsletter_slug
+     * @return array
+     */
     private function get_newsletter_settings($newsletter_slug) {
         return [
-            'subject' => get_option("newsletter_default_subject_$newsletter_slug"),
-            'from_name' => get_option('mailchimp_from_name'),
-            'reply_to' => get_option('mailchimp_reply_to')
+            'subject_line' => get_option("newsletter_subject_line_$newsletter_slug", ''),
+            'campaign_name' => get_option("newsletter_campaign_name_$newsletter_slug", ''),
+            'from_name' => get_option("newsletter_from_name_$newsletter_slug", 'Your Name'),
+            'reply_to' => get_option("newsletter_reply_to_$newsletter_slug", 'your-email@example.com')
         ];
     }
 
@@ -117,3 +133,4 @@ class Newsletter_Mailchimp_API {
         return $body;
     }
 }
+?>

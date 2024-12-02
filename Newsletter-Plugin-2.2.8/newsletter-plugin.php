@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name:       Newsletter Automator v2.2.8
- * Description:       HTML block addition, Advertising block revision, subject line creation newsletter generator cleanup.
+ * Description:       Focused on Newsetter Generator and templates
  * Version:           2.2.8
  * Author:            Jon Stewart
  * Text Domain:       newsletter

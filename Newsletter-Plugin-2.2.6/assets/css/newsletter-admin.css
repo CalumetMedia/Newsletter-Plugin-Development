@@ -1,0 +1,321 @@
+/* newsletter-admin.css */
+
+/* Import Newsletter Stories Specific Styles */
+@import url('newsletter-stories.css');
+
+/* General Styles */
+.wrap {
+    color: #333;
+}
+
+.wrap h1,
+.wrap h2,
+.wrap h3,
+.wrap h4,
+.wrap h5,
+.wrap h6 {
+    color: #222;
+    margin-bottom: 20px;
+}
+
+.wrap h1 {
+    font-size: 2em;
+    margin-bottom: 30px; /* Increased margin to prevent overlap with tabs */
+}
+
+.wrap h2 {
+    font-size: 1.5em;
+}
+
+.wrap p,
+.wrap label,
+.wrap input,
+.wrap select,
+.wrap textarea,
+.wrap table {
+    font-size: 14px;
+}
+
+.wrap a {
+    color: #0073aa;
+    text-decoration: none;
+}
+
+.wrap a:hover {
+    text-decoration: underline;
+}
+
+/* Tabs Styles */
+.wrap .nav-tab-wrapper {
+    margin-bottom: 20px;
+}
+
+.wrap .nav-tab {
+    padding: 10px 15px;
+    margin-right: 2px;
+    border: 1px solid #ccc;
+    border-bottom: none;
+    background: #f1f1f1;
+    text-decoration: none;
+    color: #000;
+    display: inline-block;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+}
+
+.wrap .nav-tab:hover {
+    background: #e7e7e7;
+}
+
+.wrap .nav-tab-active {
+    background: #fff;
+    border-bottom: 1px solid #fff;
+    font-weight: bold;
+}
+
+/* Form Styles */
+.wrap .form-table th {
+    width: 200px;
+    padding: 10px 5px;
+    vertical-align: top;
+}
+
+.wrap .form-table td {
+    padding: 10px 5px;
+}
+
+.wrap .form-table input[type="text"],
+.wrap .form-table input[type="email"],
+.wrap .form-table input[type="time"],
+.wrap .form-table select,
+.wrap .form-table textarea {
+    width: 90%;
+    padding: 8px;
+    box-sizing: border-box;
+    font-size: 14px;
+}
+
+.wrap .form-table label {
+    font-weight: bold;
+}
+
+.wrap .button-primary {
+    background-color: #0073aa;
+    border-color: #0073aa;
+    color: #fff;
+}
+
+.wrap .button-secondary {
+    background-color: #f1f1f1;
+    border-color: #ccc;
+    color: #555;
+}
+
+/* Settings Sections */
+.wrap .settings-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.wrap .settings-section {
+    flex: 1;
+    min-width: 300px;
+    background: #f9f9f9;
+    padding: 20px;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+    border-radius: 5px;
+    position: relative;
+}
+
+.wrap .settings-section h2 {
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+
+.wrap .settings-section .settings-tab {
+    position: relative; /* Changed from absolute to relative */
+    top: 0;             /* Reset top to 0 */
+    left: 0;            /* Reset left to 0 */
+    margin-bottom: 15px; /* Added margin to space it below the title */
+    background-color: #0073aa;
+    padding: 8px 12px;
+    border-radius: 5px;
+    color: #fff;
+    display: inline-block; /* Ensure it doesn't stretch full width */
+}
+
+.wrap .mailchimp-tab {
+    background-color: #FFE01B !important;
+    color: #000;
+}
+
+.wrap .premium-icon {
+    color: #ffba00;
+    margin-left: 5px;
+    vertical-align: middle;
+    font-size: 16px;
+}
+
+.wrap .premium-icon.dashicons {
+    font-size: 20px;
+    color: #ffba00;
+}
+
+.wrap .premium-description {
+    margin-top: 5px;
+    font-size: 9px;
+    color: #999;
+}
+
+.wrap .days-grid label,
+.wrap .categories-grid label,
+.wrap .custom-post-types-grid label {
+    display: inline-block;
+    width: 45%;
+    margin-right: 5%;
+    margin-bottom: 5px;
+}
+
+.wrap input[type="checkbox"] {
+    margin-right: 5px;
+}
+
+@media (max-width: 768px) {
+    .wrap .settings-container {
+        flex-direction: column;
+    }
+
+    .wrap .settings-section {
+        width: 100%;
+    }
+
+    .wrap .days-grid label,
+    .wrap .categories-grid label,
+    .wrap .custom-post-types-grid label {
+        width: 100%;
+    }
+}
+
+/* Template Management Page Styles */
+.wrap .template-management {
+    display: flex;
+    gap: 20px;
+}
+
+.wrap .template-list {
+    flex: 0 0 25%; /* Template list occupies 25% */
+}
+
+.wrap .template-editor {
+    flex: 1; /* Editor occupies the remaining 75% */
+    background-color: #f9f9f9;
+    padding: 20px;
+    border: 1px solid #ccc;
+}
+
+.wrap .template-editor h2 {
+    margin-top: 0;
+    font-size: 1.2em;
+}
+
+.wrap .template-editor .form-table th,
+.wrap .template-editor .form-table td {
+    padding: 5px;
+}
+
+.wrap .template-placeholders {
+    margin-top: 20px;
+}
+
+.wrap .template-placeholders h3 {
+    font-size: 1.1em;
+    margin-bottom: 10px;
+}
+
+.wrap .template-placeholders ul {
+    list-style-type: disc;
+    margin-left: 20px;
+}
+
+.wrap .template-placeholders li {
+    margin-bottom: 5px;
+}
+
+.wrap .code {
+    background-color: #eaeaea;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+
+/* Stories Page Styles */
+.wrap .flex-container {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.wrap .left-column,
+.wrap .right-column {
+    flex: 1;
+    max-width: 600px;
+}
+
+.wrap .form-table label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.wrap .form-table input[type="text"],
+.wrap .form-table select {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 10px;
+    box-sizing: border-box;
+}
+
+.wrap .button-large {
+    width: 100%;
+    height: 70px;
+    font-size: 20px;
+    margin-bottom: 10px;
+}
+
+.wrap .button-large.button-primary {
+    background-color: #0073aa;
+    border-color: #0073aa;
+    color: #fff;
+}
+
+.wrap .button-large.button-secondary {
+    background-color: #f1f1f1;
+    border-color: #ccc;
+    color: #555;
+}
+
+/* Settings Boxes */
+.wrap .settings-boxes {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.wrap .settings-box {
+    flex: 1;
+    min-width: 200px;
+    border: 1px solid #ccc;
+    padding: 15px;
+    box-sizing: border-box;
+    background-color: #fff;
+}
+
+.wrap .settings-box h2 {
+    margin-top: 0;
+    font-size: 18px;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 10px;
+}

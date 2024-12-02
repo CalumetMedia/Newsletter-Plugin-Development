@@ -1,0 +1,111 @@
+/* newsletter-stories.css */
+
+/* Flex Container */
+.wrap .flex-container {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.wrap .left-column {
+    flex: 2;
+    max-width: 65%;
+}
+
+.wrap .right-column {
+    flex: 1;
+    max-width: 35%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.wrap .right-column .settings-box {
+    width: 100%;
+}
+
+/* Blocks Management */
+#blocks-container .block-item {
+    border: 1px solid #ddd;
+    padding: 15px;
+    margin-bottom: 15px;
+    background-color: #f9f9f9;
+}
+
+#blocks-container .block-item h3 {
+    margin-top: 0;
+}
+
+#blocks-container .block-item label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+#blocks-container .block-item input[type="text"],
+#blocks-container .block-item select,
+#blocks-container .block-item textarea {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 10px;
+    box-sizing: border-box;
+}
+
+/* Accordion Styles */
+.wrap .block-header.ui-accordion-header {
+    border: none;
+    box-shadow: none;
+    background-color: #f1f1f1;
+    padding: 10px;
+    margin-bottom: 0;
+    color: #333;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.wrap .block-content.ui-accordion-content {
+    border: none;
+    box-shadow: none;
+    padding: 15px;
+    background-color: #fff;
+}
+
+.wrap .block-item {
+    border: none;
+    box-shadow: none;
+    background: none;
+    margin-bottom: 10px;
+}
+
+.wrap .block-content,
+.wrap .block-header {
+    border: none;
+    box-shadow: none;
+}
+
+/* Remove Gray Border from Preview Section */
+.wrap .newsletter-preview,
+.wrap .preview-content,
+.wrap .preview-image {
+    border: none;
+    box-shadow: none;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .wrap .flex-container {
+        flex-direction: column;
+    }
+
+    .wrap .left-column,
+    .wrap .right-column {
+        max-width: 100%;
+    }
+
+    .wrap .right-column {
+        align-items: center;
+    }
+}

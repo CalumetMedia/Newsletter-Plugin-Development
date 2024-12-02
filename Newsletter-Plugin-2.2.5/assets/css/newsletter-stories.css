@@ -1,0 +1,132 @@
+/* newsletter-stories.css */
+
+/* Remove borders and box-shadow from accordion headers */
+.wrap .block-header.ui-accordion-header {
+    border: none !important;
+    box-shadow: none !important;
+    background-color: #f1f1f1 !important; /* Ensure background remains consistent */
+    padding: 10px !important; /* Adjust padding as needed */
+    margin-bottom: 0; /* Remove bottom margin to prevent gaps */
+}
+
+/* Remove borders and box-shadow from accordion content */
+.wrap .block-content.ui-accordion-content {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 15px !important; /* Adjust padding as needed */
+    background-color: #fff !important; /* Ensure background is white */
+}
+
+/* Remove any remaining borders from block items */
+.wrap .block-item {
+    border: none !important;
+    box-shadow: none !important;
+    background: none !important;
+    margin-bottom: 10px; /* Adjust spacing between blocks */
+}
+
+/* Optional: Adjust Header Styles for Better Appearance */
+.wrap .block-header.ui-accordion-header {
+    background-color: #f1f1f1 !important;
+    color: #333 !important;
+    font-weight: bold;
+    cursor: pointer; /* Indicate it's clickable */
+}
+
+/* Optional: Ensure Content Area is Clean */
+.wrap .block-content {
+    background-color: #fff !important;
+    padding: 15px !important;
+}
+
+/* Ensure no unwanted borders in other elements */
+.wrap .block-content, .wrap .block-header {
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Flex Container */
+.wrap .flex-container {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+}
+
+/* Left Column */
+.wrap .left-column {
+    flex: 2;
+    max-width: 65%;
+}
+
+/* Right Column */
+.wrap .right-column {
+    flex: 1;
+    max-width: 35%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Newsletter Preview Section */
+.wrap .right-column .settings-box {
+    width: 100%;
+}
+
+/* Phone Preview Container */
+#story-preview {
+    position: relative;
+    width: 300px;
+    margin: 0 auto;
+}
+
+/* Phone Overlay Styling */
+#phone-overlay {
+    width: 100%;
+    height: auto;
+    display: block;
+    margin: 0 auto;
+    position: relative;
+}
+
+/* Preview Content Styling */
+#preview-content {
+    position: absolute;
+    top: 58px;
+    left: 17px;
+    width: 265px;
+    height: 475px;
+    overflow-y: scroll;
+    background-color: white;
+    border: none !important; /* Remove any borders */
+    box-shadow: none !important; /* Remove any shadows */
+}
+
+/* Remove Gray Border from Preview Section */
+.wrap .newsletter-preview {
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Ensure No Unwanted Borders */
+.wrap .preview-content, .wrap .preview-image {
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .wrap .flex-container {
+        flex-direction: column;
+    }
+
+    .wrap .left-column,
+    .wrap .right-column {
+        max-width: 100%;
+    }
+
+    .wrap .right-column {
+        align-items: center;
+    }
+}

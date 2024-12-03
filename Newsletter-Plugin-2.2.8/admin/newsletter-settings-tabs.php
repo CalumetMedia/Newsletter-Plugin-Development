@@ -41,13 +41,11 @@ $tabs['delete_newsletter'] = __('Delete Newsletter', 'newsletter');
                 $tab_name = '<span style="background-color:green; color:white; padding:2px 5px; border-radius:3px;">&#43;</span> ' . $tab_name;
             } elseif ($tab_key === 'delete_newsletter') {
                 $tab_name = '<span style="background-color:red; color:white; padding:2px 5px; border-radius:3px;">&#8722;</span> ' . $tab_name;
-            } elseif ($tab_key === 'templates') {
-                // Include pencil icon for Templates tab
-                $tab_name = '<span style="background-color:black; color:white; padding:2px 5px; border-radius:3px;">&#9998;</span> ' . $tab_name;
             } elseif ($tab_key === 'mailchimp') {
-                // Include Mailchimp logo in the tab
                 $image_url = plugin_dir_url(dirname(__FILE__)) . 'assets/images/mailchimp-logo.webp';
                 $tab_name = '<img src="' . esc_url($image_url) . '" alt="' . esc_attr__('Mailchimp Settings', 'newsletter') . '" style="height: 20px; vertical-align: middle; margin-right: 5px;">';
+            } elseif ($tab_key === 'templates') {
+                $tab_name = '<span style="background-color:black; color:white; padding:2px 5px; border-radius:3px;">&#9998;</span> ' . $tab_name;
             }
 
             echo '<a href="' . esc_url($tab_url) . '" class="nav-tab ' . esc_attr($active) . '">' . wp_kses_post($tab_name) . '</a>';

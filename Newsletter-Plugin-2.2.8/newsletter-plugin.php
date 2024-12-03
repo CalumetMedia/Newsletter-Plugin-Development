@@ -38,83 +38,16 @@ $mailchimp = new Newsletter_Mailchimp_API();
  * Activation Hook
  */
 function newsletter_plugin_activate() {
-    // Initialize newsletter_list option if not already set
-    $newsletter_list = get_option('newsletter_list', []);
-    if (!array_key_exists('default', $newsletter_list)) {
-        $newsletter_list['default'] = __('Default Newsletter', 'newsletter');
-        update_option('newsletter_list', $newsletter_list);
-        error_log("Activation Hook: 'default' added to newsletter_list.");
-    } else {
-        error_log("Activation Hook: 'default' already exists in newsletter_list.");
+    // Initialize empty newsletter list if not already set
+    if (!get_option('newsletter_list')) {
+        update_option('newsletter_list', []);
+        error_log("Activation Hook: Empty newsletter list initialized.");
     }
 
-    // Initialize default template if not set
-    if (!get_option('newsletter_default_template')) {
-        $default_template = '<div class="post-item">
-    <h3>{title}</h3>
-    <div class="post-thumbnail">
-        <img src="{thumbnail_url}" alt="{title}">
-    </div>
-    <div class="post-content">
-        {content}
-    </div>
-    <a href="{permalink}">' . __('Read More', 'newsletter') . '</a>
-</div>';
-        update_option('newsletter_default_template', $default_template);
-        error_log("Activation Hook: Default template initialized.");
-    } else {
-        error_log("Activation Hook: Default template already exists.");
-    }
-
-    // Initialize newsletter_templates option if not already set
-    $newsletter_templates = get_option('newsletter_templates', []);
-    if (empty($newsletter_templates)) {
-        $default_template_content = get_option('newsletter_default_template', '');
-        $newsletter_templates = [
-            'default' => [
-                'id'      => 'default',
-                'name'    => __('Default Template', 'newsletter'),
-                'content' => $default_template_content,
-            ],
-            // Add more default templates as needed
-        ];
-        update_option('newsletter_templates', $newsletter_templates);
-        error_log("Activation Hook: Default templates initialized.");
-    } else {
-        // Ensure each template has 'content' field
-        foreach ($newsletter_templates as $template_id => $template) {
-            if (!isset($template['content'])) {
-                $template['content'] = get_option('newsletter_default_template', '');
-                $newsletter_templates[$template_id] = $template;
-                error_log("Activation Hook: Added 'content' to template '{$template_id}'.");
-            }
-        }
-        update_option('newsletter_templates', $newsletter_templates);
-        error_log("Activation Hook: Newsletter templates already exist.");
-    }
-
-    // Initialize default blocks for 'default' newsletter if not set
-    $default_blocks_option = 'newsletter_blocks_default';
-    if (!get_option($default_blocks_option)) {
-        $default_blocks = [
-            [
-                'type'        => 'content',
-                'title'       => __('Latest Posts', 'newsletter'),
-                'category'    => 0, // Default category ID if needed
-                'template_id' => 'default',
-                'posts'       => [], // Optionally, add default post IDs here
-            ],
-            [
-                'type'        => 'advertising',
-                'title'       => __('Sponsored', 'newsletter'),
-                'template_id' => 'default',
-                'html'        => '<div>' . __('Buy our product!', 'newsletter') . '</div>',
-            ],
-        ];
-        update_option($default_blocks_option, $default_blocks);
-        error_log("Activation Hook: Default blocks for 'default' newsletter initialized.");
-    } else {
-        error_log("Activation Hook: Default blocks for 'default' newsletter already exist.");
+    // Initialize empty templates list if not already set
+    if (!get_option('newsletter_templates')) {
+        update_option('newsletter_templates', []);
+        error_log("Activation Hook: Empty templates list initialized.");
     }
 }
 register_activation_hook(__FILE__, 'newsletter_plugin_activate');

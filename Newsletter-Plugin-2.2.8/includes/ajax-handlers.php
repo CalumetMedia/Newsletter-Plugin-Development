@@ -85,6 +85,7 @@ function newsletter_generate_preview() {
     $blocks = isset($_POST['blocks']) ? $_POST['blocks'] : [];
     $custom_header = isset($_POST['custom_header']) ? wp_kses_post($_POST['custom_header']) : '';
     $custom_footer = isset($_POST['custom_footer']) ? wp_kses_post($_POST['custom_footer']) : '';
+    $custom_css = isset($_POST['custom_css']) ? wp_strip_all_tags($_POST['custom_css']) : '';
 
     // Save custom header/footer temporarily if provided
     if (!empty($custom_header)) {
@@ -92,6 +93,11 @@ function newsletter_generate_preview() {
     }
     if (!empty($custom_footer)) {
         update_option("newsletter_custom_footer_$newsletter_slug", $custom_footer);
+    }
+    
+    // Save custom CSS if provided
+    if (!empty($custom_css)) {
+        update_option("newsletter_custom_css_$newsletter_slug", $custom_css);
     }
 
     $sanitized_blocks = [];
@@ -123,11 +129,25 @@ function newsletter_generate_preview() {
         $sanitized_blocks[] = $sanitized_block;
     }
 
-    $preview_html = newsletter_generate_preview_content($newsletter_slug, $sanitized_blocks);
+    $preview_content = newsletter_generate_preview_content($newsletter_slug, $sanitized_blocks);
+    
+    // Wrap content in scoped container with CSS
+    $preview_html = '<div class="newsletter-preview-container">';
+    if (!empty($custom_css)) {
+        $preview_html .= '<style type="text/css">';
+        $preview_html .= '.newsletter-preview-container {';
+        $preview_html .= $custom_css;
+        $preview_html .= '}';
+        $preview_html .= '</style>';
+    }
+    $preview_html .= '<div class="newsletter-content">';
+    $preview_html .= $preview_content;
+    $preview_html .= '</div>';
+    $preview_html .= '</div>';
+
     wp_send_json_success($preview_html);
 }
 add_action('wp_ajax_generate_preview', 'newsletter_generate_preview');
-
 
 /**
  * AJAX Handler to Save Newsletter Blocks
@@ -137,6 +157,19 @@ function newsletter_handle_blocks_form_submission() {
 
     if (!current_user_can('manage_options')) {
         wp_send_json_error(__('You do not have permission to perform this action.', 'newsletter'));
+    }
+
+    $newsletter_slug = isset($_POST['newsletter_slug']) ? sanitize_text_field($_POST['newsletter_slug']) : 'default';
+
+    // Save manual schedule settings first
+    if (isset($_POST['use_manual_schedule'])) {
+        update_option("newsletter_use_manual_schedule_$newsletter_slug", true);
+        update_option("newsletter_manual_schedule_date_$newsletter_slug", sanitize_text_field($_POST['manual_schedule_date']));
+        update_option("newsletter_manual_schedule_time_$newsletter_slug", sanitize_text_field($_POST['manual_schedule_time']));
+    } else {
+        update_option("newsletter_use_manual_schedule_$newsletter_slug", false);
+        delete_option("newsletter_manual_schedule_date_$newsletter_slug");
+        delete_option("newsletter_manual_schedule_time_$newsletter_slug");
     }
 
     $newsletter_slug = isset($_POST['newsletter_slug']) ? sanitize_text_field($_POST['newsletter_slug']) : 'default';
@@ -225,6 +258,15 @@ function create_mailchimp_campaign() {
         wp_send_json_error('Newsletter slug is required.');
         return;
     }
+
+
+    $use_manual = isset($_POST['use_manual_schedule']) ? (bool)$_POST['use_manual_schedule'] : false;
+    $manual_date = isset($_POST['manual_schedule_date']) ? sanitize_text_field($_POST['manual_schedule_date']) : '';
+    $manual_time = isset($_POST['manual_schedule_time']) ? sanitize_text_field($_POST['manual_schedule_time']) : '';
+
+    update_option("newsletter_use_manual_schedule_$newsletter_slug", $use_manual);
+    update_option("newsletter_manual_schedule_date_$newsletter_slug", $manual_date);
+    update_option("newsletter_manual_schedule_time_$newsletter_slug", $manual_time);
 
     // Get blocks and generate content
     $blocks = get_option("newsletter_blocks_$newsletter_slug", []);

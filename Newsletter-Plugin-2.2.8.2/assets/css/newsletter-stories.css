@@ -1,0 +1,224 @@
+/* Layout: Flex Container */
+.wrap .flex-container {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.wrap .left-column {
+    flex: 2;
+    max-width: 65%;
+}
+
+.wrap .right-column {
+    flex: 1;
+    max-width: 35%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: sticky;
+    top: 32px;
+    height: calc(100vh - 32px);
+    overflow-y: auto;
+}
+
+.wrap .right-column .settings-box {
+    width: 100%;
+}
+
+/* Block Styling */
+.block-item {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.2s ease;
+}
+
+.block-header {
+    display: flex;
+    align-items: center;
+    padding: 1rem;
+    background: white;
+    border-radius: 8px 8px 0 0;
+}
+
+.drag-handle {
+    cursor: move;
+    cursor: grab;
+    margin-right: 15px;
+    color: #718096;
+}
+
+.block-accordion-toggle {
+    margin-left: auto;
+    cursor: pointer;
+    color: #718096;
+}
+
+.block-header .dashicons {
+    width: 20px;
+    height: 20px;
+    font-size: 20px;
+    line-height: 20px;
+}
+
+.block-title {
+    flex: 1;
+}
+
+.block-toggle-icon {
+    margin-left: auto;
+    transition: transform 0.2s ease;
+}
+
+.block-toggle-icon.rotate-180 {
+    transform: rotate(180deg);
+}
+
+.block-content {
+    display: none;
+    padding: 15px;
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+}
+
+
+/* Form Elements within Blocks */
+.block-item label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.block-item input[type="text"],
+.block-item select,
+.block-item textarea {
+    width: 100%;
+    padding: 8px;
+    margin-bottom: 10px;
+    box-sizing: border-box;
+}
+
+/* Sortable Styling */
+.ui-sortable-helper {
+    background: white !important;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.ui-sortable-placeholder {
+    visibility: visible !important;
+    height: 100px !important;
+    background: #f7fafc !important;
+    border: 2px dashed #cbd5e0;
+    margin-bottom: 1rem;
+    border-radius: 8px;
+}
+
+/* Campaign Settings Layout */
+.settings-and-buttons {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.campaign-settings {
+    width: 60%;
+    margin-right: 20px;
+}
+
+.campaign-settings .form-table {
+    width: 100%;
+}
+
+.campaign-settings .form-table input[type="text"],
+.campaign-settings .form-table textarea {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+/* Button Group */
+.button-group {
+    width: 35%;
+    padding-top: 40px;
+    display: flex;
+    flex-direction: column;
+}
+
+.button-group .buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    width: 100%;
+}
+
+/* Tab Content */
+.tab-content {
+    display: none;
+    width: 100%;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Preview Section */
+.newsletter-preview,
+.preview-content,
+.preview-image {
+    border: none;
+    box-shadow: none;
+}
+
+/* Posts List in Blocks */
+.sortable-posts {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.sortable-posts li {
+    padding: 10px;
+    background: white;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 5px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+}
+
+.sortable-posts .dashicons-menu {
+    cursor: move;
+    margin-right: 10px;
+    color: #718096;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .wrap .flex-container {
+        flex-direction: column;
+    }
+
+    .wrap .left-column,
+    .wrap .right-column {
+        max-width: 100%;
+    }
+
+    .wrap .settings-and-buttons {
+        flex-direction: column;
+    }
+
+    .campaign-settings,
+    .button-group {
+        width: 100%;
+        margin-right: 0;
+    }
+}

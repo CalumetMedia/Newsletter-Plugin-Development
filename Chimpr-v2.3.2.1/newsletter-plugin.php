@@ -1,8 +1,8 @@
 <?php
 /**
- * Plugin Name:       Chimpr v2.3.2
- * Description:       Stable automation, Generate PDF included but disabled.  Template redesign, allowing for PDFs.
- * Version:           2.3.2
+ * Plugin Name:       Chimpr v2.3.2.1
+ * Description:       Scheduling working. 
+ * Version:           2.3.2.1
  * Author:            Jon Stewart
  * Text Domain:       chimpr-newsletter
  */

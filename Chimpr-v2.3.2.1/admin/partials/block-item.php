@@ -116,6 +116,24 @@ if (!isset($block_templates['default'])) {
             </select>
         </div>
 
+        <!-- Story Count Selector -->
+        <div class="story-count-row" style="margin-bottom: 10px;" <?php if ($block['type'] === 'html' || $block['type'] === 'wysiwyg') echo 'style="display:none;"'; ?>>
+            <?php
+            $current_story_count = isset($block['story_count']) ? $block['story_count'] : 'disable';
+            error_log('Rendering story count selector with current value: ' . $current_story_count);
+            ?>
+            <label><?php esc_html_e('Number of Stories:', 'newsletter'); ?></label>
+            <select name="blocks[<?php echo esc_attr($index); ?>][story_count]" 
+                    class="block-story-count" 
+                    style="width: 200px; height: 36px; line-height: 1.4; padding: 0 6px;">
+                <option value="disable" <?php selected($current_story_count, 'disable'); ?>><?php esc_html_e('Manual Selection', 'newsletter'); ?></option>
+                <option value="all" <?php selected($current_story_count, 'all'); ?>><?php esc_html_e('All', 'newsletter'); ?></option>
+                <?php for ($i = 1; $i <= 10; $i++) : ?>
+                    <option value="<?php echo $i; ?>" <?php selected($current_story_count, $i); ?>><?php echo $i; ?></option>
+                <?php endfor; ?>
+            </select>
+        </div>
+
         <!-- WYSIWYG Block -->
         <?php if ($block['type'] === 'wysiwyg'): ?>
 <!-- WYSIWYG Block -->

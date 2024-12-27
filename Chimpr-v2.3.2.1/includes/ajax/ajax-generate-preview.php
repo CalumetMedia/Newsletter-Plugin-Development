@@ -32,7 +32,7 @@ function newsletter_generate_preview() {
             'title'       => sanitize_text_field($block['title']),
             'template_id' => sanitize_text_field($block['template_id'] ?? 'default'),
             'show_title'  => isset($block['show_title']),
-            'post_count'  => isset($block['post_count']) ? intval($block['post_count']) : 5,
+            'story_count' => isset($block['story_count']) ? sanitize_text_field($block['story_count']) : 'disable',
             'date_range'  => isset($block['date_range']) ? intval($block['date_range']) : 7
         ];
 

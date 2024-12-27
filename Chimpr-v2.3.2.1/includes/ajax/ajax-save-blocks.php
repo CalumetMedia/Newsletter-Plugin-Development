@@ -17,8 +17,12 @@ function newsletter_handle_blocks_form_submission() {
             'title' => sanitize_text_field($block['title']),
             'template_id' => sanitize_text_field($block['template_id'] ?? 'default'),
             'show_title' => isset($block['show_title']),
-            'date_range' => isset($block['date_range']) ? intval($block['date_range']) : 7
+            'date_range' => isset($block['date_range']) ? intval($block['date_range']) : 7,
+            'story_count' => isset($block['story_count']) ? sanitize_text_field($block['story_count']) : 'disable'
         ];
+
+        // Add debug logging
+        error_log('Saving block with story count: ' . $sanitized_block['story_count']);
 
         // Handle different block types
         if ($block['type'] === 'content') {

@@ -325,11 +325,16 @@ wp_localize_script('newsletter-admin-js', 'newsletterData', [
                                     <strong><?php esc_html_e('SEND DRAFT', 'newsletter'); ?></strong>
                                 </button>
 
-                                <button type="button" class="button button-large action-button schedule-button" id="schedule-campaign">
-                                    <span class="dashicons dashicons-calendar" style="vertical-align: middle; margin-right:5px;"></span>
-                                    <strong><?php esc_html_e('SCHEDULE', 'newsletter'); ?></strong>
-                                </button>
-
+<?php if ($next_scheduled_timestamp): ?>
+    <button type="button" 
+            class="button button-large action-button schedule-button" 
+            id="schedule-campaign" 
+            data-timestamp="<?php echo esc_attr((int)$next_scheduled_timestamp); ?>"
+            data-formatted-time="<?php echo esc_attr(wp_date('F j, Y g:i a', $next_scheduled_timestamp)); ?>">
+        <span class="dashicons dashicons-calendar" style="vertical-align: middle; margin-right:5px;"></span>
+        <strong><?php esc_html_e('SCHEDULE', 'newsletter'); ?></strong>
+    </button>
+<?php endif; ?> 
                                 <button type="button" class="button button-large action-button schedule-button" id="send-now">
                                     <span class="dashicons dashicons-megaphone" style="vertical-align: middle; margin-right:5px;"></span>
                                     <strong><?php esc_html_e('SEND NOW', 'newsletter'); ?></strong>
@@ -383,6 +388,7 @@ wp_localize_script('newsletter-admin-js', 'newsletterData', [
                                 'posts'       => [],
                                 'html'        => '',
                                 'template_id' => 'default',
+                                'story_count' => 'disable'
                             ];
                             include NEWSLETTER_PLUGIN_DIR . 'admin/partials/block-item.php';
                         }

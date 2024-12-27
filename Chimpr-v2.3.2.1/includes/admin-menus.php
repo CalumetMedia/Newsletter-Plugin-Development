@@ -5,7 +5,7 @@ add_action('admin_menu', 'newsletter_setup_menu');
 function newsletter_setup_menu() {
     add_menu_page(
         'Newsletter',
-        'Chimpr v2.3.2',
+        'Chimpr v2.3.2.1',
         'manage_options',
         'newsletter-settings',
         'newsletter_all_settings_page',

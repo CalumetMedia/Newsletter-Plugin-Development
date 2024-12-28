@@ -1,4 +1,7 @@
 (function($) {
+    // Global initialization flag
+    window.blockManagerInitialized = false;
+    
     // Initialize sortable for posts
     window.initializeSortable = function(block) {
         var sortableList = block.find('ul.sortable-posts');
@@ -57,43 +60,86 @@
         var storyCount = block.find('.block-story-count').val();
         
         if (categoryId) {
+            // Get initial saved selections from rendered checkboxes
+            var savedSelections = {};
+            block.find('input[type="checkbox"][name*="[posts]"][name*="[selected]"]').each(function() {
+                var $this = $(this);
+                var postId = $this.closest('li').data('post-id');
+                var $orderInput = $this.closest('li').find('.post-order');
+                var order = $orderInput.length ? $orderInput.val() : '0';
+                
+                // Include all posts in savedSelections, whether checked or not
+                savedSelections[postId] = {
+                    selected: $this.is(':checked'),
+                    order: order
+                };
+            });
+
             console.log('Initial load for block:', {
                 categoryId: categoryId,
                 dateRange: dateRange,
                 blockIndex: blockIndex,
-                storyCount: storyCount
+                storyCount: storyCount,
+                savedSelections: savedSelections
             });
-            loadBlockPosts(block, categoryId, blockIndex, dateRange, storyCount);
+
+            var data = {
+                action: 'load_block_posts',
+                security: newsletterData.nonceLoadPosts,
+                category_id: categoryId,
+                block_index: blockIndex,
+                date_range: dateRange,
+                story_count: storyCount,
+                newsletter_slug: newsletterData.newsletterSlug,
+                saved_selections: JSON.stringify(savedSelections)
+            };
+            
+            $.ajax({
+                url: newsletterData.ajaxUrl,
+                method: 'POST',
+                dataType: 'json',
+                data: data,
+                beforeSend: function() {
+                    block.find('.block-posts').addClass('loading');
+                },
+                success: function(response) {
+                    block.find('.block-posts').removeClass('loading');
+                    if (response.success) {
+                        block.find('.block-posts').html(response.data);
+                        initializeSortable(block);
+                        // Don't call updatePreview here - it will be called once after all blocks are initialized
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error('AJAX Error:', error);
+                    block.find('.block-posts').removeClass('loading');
+                }
+            });
         }
 
         // When a post is selected/unselected, update the preview
-    block.on('change', 'input[type="checkbox"][name*="[selected]"]', function() {
-        var $this = $(this);
-        var $block = $this.closest('.block-item');
-        var $storyCount = $block.find('.block-story-count');
-        
-        // Switch to manual mode if user manually changes checkbox
-        if ($storyCount.val() !== 'disable') {
-            $storyCount.val('disable');
-        }
-        
-        var $orderInput = $this.closest('li').find('.post-order');
-        if ($this.is(':checked')) {
-            // Ensure order value is set when checked
-            if (!$orderInput.val() || $orderInput.val() === '0') {
-                var maxOrder = 0;
-                block.find('.post-order').each(function() {
-                    var val = parseInt($(this).val()) || 0;
-                    maxOrder = Math.max(maxOrder, val);
-                });
-                $orderInput.val(maxOrder + 1);
+        block.on('change', 'input[type="checkbox"][name*="[selected]"]', function() {
+            var $this = $(this);
+            var $block = $this.closest('.block-item');
+            var $storyCount = $block.find('.block-story-count');
+            
+            // Switch to manual mode if user manually changes checkbox
+            if ($storyCount.val() !== 'disable') {
+                $storyCount.val('disable');
             }
-        }
-        updatePreview();
-    });
-
-        // When WYSIWYG or HTML content changes, update preview
-        block.find('.html-block textarea, .wysiwyg-block textarea').on('input', function() {
+            
+            var $orderInput = $this.closest('li').find('.post-order');
+            if ($this.is(':checked')) {
+                // Ensure order value is set when checked
+                if (!$orderInput.val() || $orderInput.val() === '0') {
+                    var maxOrder = 0;
+                    block.find('.post-order').each(function() {
+                        var val = parseInt($(this).val()) || 0;
+                        maxOrder = Math.max(maxOrder, val);
+                    });
+                    $orderInput.val(maxOrder + 1);
+                }
+            }
             updatePreview();
         });
 
@@ -115,6 +161,16 @@
             });
             
             if (categoryId) {
+                // Get current selections for this block
+                var savedSelections = {};
+                $block.find('input[type="checkbox"][name*="[selected]"]:checked').each(function() {
+                    var postId = $(this).closest('li').data('post-id');
+                    savedSelections[postId] = {
+                        selected: true,
+                        order: $(this).closest('li').find('.post-order').val()
+                    };
+                });
+
                 var data = {
                     action: 'load_block_posts',
                     security: newsletterData.nonceLoadPosts,
@@ -122,7 +178,8 @@
                     block_index: blockIndex,
                     date_range: dateRange,
                     story_count: storyCount,
-                    newsletter_slug: newsletterData.newsletterSlug
+                    newsletter_slug: newsletterData.newsletterSlug,
+                    saved_selections: JSON.stringify(savedSelections)
                 };
                 
                 console.log('Sending request with data:', data);
@@ -163,15 +220,51 @@
             var storyCount = $block.find('.block-story-count').val();
             
             if (categoryId) {
-                loadBlockPosts($block, categoryId, blockIndex, dateRange, storyCount);
-            }
-        });
+                // Get current selections for this block
+                var savedSelections = {};
+                $block.find('input[type="checkbox"][name*="[selected]"]:checked').each(function() {
+                    var postId = $(this).closest('li').data('post-id');
+                    savedSelections[postId] = {
+                        selected: true,
+                        order: $(this).closest('li').find('.post-order').val()
+                    };
+                });
 
-        // Block type change
-        block.find('.block-type').off('change').on('change', function() {
-            var newBlockType = $(this).val();
-            handleBlockTypeChange(block, newBlockType);
-            updatePreview();
+                var data = {
+                    action: 'load_block_posts',
+                    security: newsletterData.nonceLoadPosts,
+                    category_id: categoryId,
+                    block_index: blockIndex,
+                    date_range: dateRange,
+                    story_count: storyCount,
+                    newsletter_slug: newsletterData.newsletterSlug,
+                    saved_selections: JSON.stringify(savedSelections)
+                };
+                
+                console.log('Date range change sending request:', data);
+                
+                $.ajax({
+                    url: newsletterData.ajaxUrl,
+                    method: 'POST',
+                    dataType: 'json',
+                    data: data,
+                    beforeSend: function() {
+                        $block.find('.block-posts').addClass('loading');
+                    },
+                    success: function(response) {
+                        $block.find('.block-posts').removeClass('loading');
+                        if (response.success) {
+                            $block.find('.block-posts').html(response.data);
+                            initializeSortable($block);
+                            updatePreview();
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('AJAX Error:', error);
+                        $block.find('.block-posts').removeClass('loading');
+                    }
+                });
+            }
         });
 
         // Story count change handler
@@ -199,6 +292,16 @@
             var dateRange = $block.find('.block-date-range').val();
             var blockIndex = $block.data('index');
             
+            // Get current selections for this block
+            var savedSelections = {};
+            $block.find('input[type="checkbox"][name*="[selected]"]:checked').each(function() {
+                var postId = $(this).closest('li').data('post-id');
+                savedSelections[postId] = {
+                    selected: true,
+                    order: $(this).closest('li').find('.post-order').val()
+                };
+            });
+            
             var data = {
                 action: 'load_block_posts',
                 security: newsletterData.nonceLoadPosts,
@@ -206,7 +309,8 @@
                 block_index: blockIndex,
                 date_range: dateRange,
                 story_count: storyCount,
-                newsletter_slug: newsletterData.newsletterSlug
+                newsletter_slug: newsletterData.newsletterSlug,
+                saved_selections: JSON.stringify(savedSelections)
             };
             
             console.log('Story count change sending request:', data);
@@ -230,12 +334,64 @@
         var blockType = block.find('.block-type').val();
         handleBlockTypeChange(block, blockType);
 
-        // Initial preview update
-        updatePreview();
+        // When WYSIWYG or HTML content changes, update preview
+        block.find('.html-block textarea, .wysiwyg-block textarea').on('input', function() {
+            updatePreview();
+        });
+
+        // Block type change
+        block.find('.block-type').off('change').on('change', function() {
+            var newBlockType = $(this).val();
+            handleBlockTypeChange(block, newBlockType);
+            updatePreview();
+        });
+
+        // Don't call updatePreview here - it will be called once after all blocks are initialized
     };
 
     // Load block posts via AJAX
     window.loadBlockPosts = function(block, categoryId, currentIndex, dateRange, storyCount) {
+        // Get current selections for this block
+        var savedSelections = {};
+        
+        // First get any checked checkboxes
+        block.find('input[type="checkbox"][name*="[posts]"][name*="[selected]"]:checked').each(function() {
+            var $checkbox = $(this);
+            var postId = $checkbox.closest('li').data('post-id');
+            var $orderInput = $checkbox.closest('li').find('.post-order');
+            savedSelections[postId] = {
+                selected: true,
+                order: $orderInput.length ? $orderInput.val() : '0'
+            };
+        });
+        
+        // Then get any hidden inputs that store saved selections
+        block.find('input[type="hidden"][name*="[posts]"][name*="[saved_selections]"]').each(function() {
+            try {
+                var savedData = JSON.parse($(this).val());
+                if (savedData && typeof savedData === 'object') {
+                    Object.keys(savedData).forEach(function(postId) {
+                        if (savedData[postId].selected) {
+                            savedSelections[postId] = savedData[postId];
+                        }
+                    });
+                }
+            } catch (e) {
+                console.error('Error parsing saved selections:', e);
+            }
+        });
+
+        // Also check for any data-was-selected attributes on the list items
+        block.find('li[data-post-id][data-was-selected="1"]').each(function() {
+            var $li = $(this);
+            var postId = $li.data('post-id');
+            var $orderInput = $li.find('.post-order');
+            savedSelections[postId] = {
+                selected: true,
+                order: $orderInput.length ? $orderInput.val() : '0'
+            };
+        });
+
         var data = {
             action: 'load_block_posts',
             security: newsletterData.nonceLoadPosts,
@@ -243,12 +399,13 @@
             block_index: currentIndex,
             date_range: dateRange,
             story_count: storyCount,
-            newsletter_slug: newsletterData.newsletterSlug
+            newsletter_slug: newsletterData.newsletterSlug,
+            saved_selections: JSON.stringify(savedSelections)
         };
 
-        console.log('Sending request:', data);
+        console.log('Loading posts with saved selections:', savedSelections);
 
-        $.ajax({
+        return $.ajax({
             url: newsletterData.ajaxUrl,
             method: 'POST',
             dataType: 'json',
@@ -260,8 +417,27 @@
                 block.find('.block-posts').removeClass('loading');
                 if (response.success) {
                     block.find('.block-posts').html(response.data);
+                    
+                    // After loading new content, restore any saved selections
+                    Object.keys(savedSelections).forEach(function(postId) {
+                        var selection = savedSelections[postId];
+                        if (selection.selected) {
+                            var $li = block.find('li[data-post-id="' + postId + '"]');
+                            if ($li.length) {
+                                var $checkbox = $li.find('input[type="checkbox"][name*="[selected]"]');
+                                var $orderInput = $li.find('.post-order');
+                                
+                                if ($checkbox.length) {
+                                    $checkbox.prop('checked', true);
+                                }
+                                if ($orderInput.length && selection.order) {
+                                    $orderInput.val(selection.order);
+                                }
+                            }
+                        }
+                    });
+                    
                     initializeSortable(block);
-                    updatePreview();
                 }
             },
             error: function(xhr, status, error) {
@@ -272,8 +448,8 @@
     };
 
     // Add a new block
-window.addBlock = function() {
-    var blockIndex = $('#blocks-container .block-item').length;
+    window.addBlock = function() {
+        var blockIndex = $('#blocks-container .block-item').length;
         var blockHtml = `
 <div class="block-item" data-index="${blockIndex}">
     <h3 class="block-header">
@@ -362,28 +538,29 @@ window.addBlock = function() {
     </div>
 </div>`;
 
-    $('#blocks-container').append(blockHtml);
-    var newBlock = $('#blocks-container .block-item').last();
-    initializeBlockEvents(newBlock);
+        $('#blocks-container').append(blockHtml);
+        var newBlock = $('#blocks-container .block-item').last();
+        initializeBlockEvents(newBlock);
 
-
-    // Reinitialize accordion for all blocks
-    $("#blocks-container").accordion('destroy').accordion({
-        header: ".block-header",
-        collapsible: true,
-        active: blockIndex,  // Activate the new block
-        heightStyle: "content"
-    });
-
-
-
-
+        // Reinitialize accordion for all blocks
+        $("#blocks-container").accordion('destroy').accordion({
+            header: ".block-header",
+            collapsible: true,
+            active: blockIndex,  // Activate the new block
+            heightStyle: "content"
+        });
 
         // After adding a new block, update the preview
         updatePreview();
     };
 
     $(document).ready(function() {
+        // Prevent multiple initializations
+        if (window.blockManagerInitialized) {
+            return;
+        }
+        window.blockManagerInitialized = true;
+
         if ($.fn.accordion) {
             $('#blocks-container').accordion({
                 header: '.block-header',
@@ -394,11 +571,51 @@ window.addBlock = function() {
             });
         }
 
+        // Track initialization of blocks
+        var totalBlocks = $('#blocks-container .block-item').length;
+        var initializedBlocks = 0;
+        var loadPromises = [];
+
         // Initialize existing blocks
         $('#blocks-container .block-item').each(function() {
-            initializeBlockEvents($(this));
+            var $block = $(this);
+            
+            // Set up event handlers
+            initializeBlockEvents($block);
+            
+            // Only do the initial load for blocks that have a category selected
+            var categoryId = $block.find('.block-category').val();
+            if (categoryId) {
+                var dateRange = $block.find('.block-date-range').val();
+                var blockIndex = $block.data('index');
+                var storyCount = $block.find('.block-story-count').val();
+                
+                // Get initial saved selections from rendered checkboxes
+                var savedSelections = {};
+                $block.find('input[type="checkbox"][name*="[posts]"][name*="[selected]"]').each(function() {
+                    var $this = $(this);
+                    var postId = $this.closest('li').data('post-id');
+                    var $orderInput = $this.closest('li').find('.post-order');
+                    var order = $orderInput.length ? $orderInput.val() : '0';
+                    
+                    savedSelections[postId] = {
+                        selected: $this.is(':checked'),
+                        order: order
+                    };
+                });
+
+                var promise = loadBlockPosts($block, categoryId, blockIndex, dateRange, storyCount);
+                loadPromises.push(promise);
+            }
+            initializedBlocks++;
         });
 
+        // Wait for all blocks to load before updating preview
+        $.when.apply($, loadPromises).always(function() {
+            setTimeout(function() {
+                updatePreview();
+            }, 100);
+        });
 
         // Remove block triggers a preview update
         $(document).on('click', '.remove-block', function() {
@@ -407,31 +624,4 @@ window.addBlock = function() {
             updatePreview();
         });
     });
-
-    // Update preview function
-    window.updatePreview = function() {
-        // Store current story count values
-        var storyCountValues = {};
-        $('.block-story-count').each(function() {
-            var $block = $(this).closest('.block-item');
-            var blockIndex = $block.data('index');
-            storyCountValues[blockIndex] = $(this).val();
-        });
-        
-        console.log('Stored story count values:', storyCountValues);
-        
-        // Your existing preview update code here
-        
-        // Restore story count values
-        setTimeout(function() {
-            $('.block-story-count').each(function() {
-                var $block = $(this).closest('.block-item');
-                var blockIndex = $block.data('index');
-                if (storyCountValues[blockIndex]) {
-                    $(this).val(storyCountValues[blockIndex]);
-                }
-            });
-            console.log('Restored story count values:', storyCountValues);
-        }, 100);
-    };
 })(jQuery);

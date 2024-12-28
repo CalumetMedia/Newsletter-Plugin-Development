@@ -19,6 +19,7 @@ if (!function_exists('get_newsletter_posts')) {
             $template_id = isset($block['template_id']) ? sanitize_text_field($block['template_id']) : 'default';
             $show_title  = isset($block['show_title']) ? (bool)$block['show_title'] : true;
             $block_title = !empty($block['title']) ? sanitize_text_field($block['title']) : '';
+            $story_count = isset($block['story_count']) ? $block['story_count'] : 'disable';
 
             switch ($block['type']) {
                 case 'content':
@@ -35,21 +36,43 @@ if (!function_exists('get_newsletter_posts')) {
                             'template_id' => $template_id
                         ];
 
+                        // Convert posts array to a sortable array with order
+                        $sorted_posts = [];
                         foreach ($block['posts'] as $post_id => $post_data) {
                             if (!empty($post_data['selected'])) {
-                                $post = get_post($post_id);
-                                if ($post) {
-                                    $current_block['posts'][] = [
-                                        'title'         => get_the_title($post_id),
-                                        'content'       => apply_filters('the_content', $post->post_content),
-                                        'excerpt'       => get_the_excerpt($post),
-                                        'thumbnail_url' => get_the_post_thumbnail_url($post_id, 'full') ?: '',
-                                        'permalink'     => get_permalink($post_id),
-                                        'author_id'     => $post->post_author,
-                                        'author_name'   => get_the_author_meta('display_name', $post->post_author),
-                                        'ID'            => $post_id
-                                    ];
-                                }
+                                $order = isset($post_data['order']) ? intval($post_data['order']) : PHP_INT_MAX;
+                                $sorted_posts[] = [
+                                    'id' => $post_id,
+                                    'order' => $order
+                                ];
+                            }
+                        }
+
+                        // Sort posts by order
+                        usort($sorted_posts, function($a, $b) {
+                            return $a['order'] - $b['order'];
+                        });
+
+                        // Apply story count limit if set
+                        if ($story_count !== 'disable' && $story_count !== 'all') {
+                            $sorted_posts = array_slice($sorted_posts, 0, intval($story_count));
+                        }
+
+                        // Process sorted posts
+                        foreach ($sorted_posts as $sorted_post) {
+                            $post_id = $sorted_post['id'];
+                            $post = get_post($post_id);
+                            if ($post) {
+                                $current_block['posts'][] = [
+                                    'title'         => get_the_title($post_id),
+                                    'content'       => apply_filters('the_content', $post->post_content),
+                                    'excerpt'       => get_the_excerpt($post),
+                                    'thumbnail_url' => get_the_post_thumbnail_url($post_id, 'full') ?: '',
+                                    'permalink'     => get_permalink($post_id),
+                                    'author_id'     => $post->post_author,
+                                    'author_name'   => get_the_author_meta('display_name', $post->post_author),
+                                    'ID'            => $post_id
+                                ];
                             }
                         }
 

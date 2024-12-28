@@ -30,12 +30,37 @@ function newsletter_handle_blocks_form_submission() {
             $sanitized_block['posts'] = [];
             
             if (!empty($block['posts']) && is_array($block['posts'])) {
+                // Sort posts by date (newest first)
+                $sorted_posts = [];
                 foreach ($block['posts'] as $post_id => $post_data) {
-                    if (isset($post_data['selected']) && $post_data['selected'] == '1') {
+                    $post_date = get_the_date('Y-m-d H:i:s', $post_id);
+                    $sorted_posts[$post_id] = [
+                        'date' => strtotime($post_date),
+                        'data' => $post_data
+                    ];
+                }
+                uasort($sorted_posts, function($a, $b) {
+                    return $b['date'] - $a['date'];
+                });
+
+                // Get the story count value
+                $story_count = $sanitized_block['story_count'];
+                $count = ($story_count === 'disable') ? 0 : intval($story_count);
+                
+                // Add posts to sanitized block
+                $current_count = 0;
+                foreach ($sorted_posts as $post_id => $post_info) {
+                    $post_data = $post_info['data'];
+                    // If story count is enabled and we haven't reached the limit,
+                    // or if the post was manually selected
+                    if (($count > 0 && $current_count < $count) || 
+                        (isset($post_data['selected']) && $post_data['selected'] == '1')) {
+                        
                         $sanitized_block['posts'][$post_id] = [
                             'selected' => true,
-                            'order' => isset($post_data['order']) ? intval($post_data['order']) : 0
+                            'order' => isset($post_data['order']) ? intval($post_data['order']) : $current_count
                         ];
+                        $current_count++;
                     }
                 }
             }

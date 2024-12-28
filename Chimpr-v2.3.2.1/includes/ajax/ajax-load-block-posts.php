@@ -9,6 +9,7 @@ function newsletter_load_block_posts() {
     $block_index = isset($_POST['block_index']) ? intval($_POST['block_index']) : 0;
     $date_range = isset($_POST['date_range']) ? intval($_POST['date_range']) : 7;
     $story_count = isset($_POST['story_count']) ? $_POST['story_count'] : 'disable';
+    $saved_selections = isset($_POST['saved_selections']) ? json_decode(stripslashes($_POST['saved_selections']), true) : [];
 
     error_log("Loading posts with params: category=$category_id, block=$block_index, range=$date_range, count=$story_count");
 
@@ -92,19 +93,20 @@ function newsletter_load_block_posts() {
         foreach ($posts as $index => $post) {
             $post_id = $post->ID;
             
-            // Auto-check based on story count and order
+            // Check if post was previously selected
+            $was_selected = !empty($saved_selections[$post_id]['selected']);
+            
+            // Auto-check based on story count and order, or if previously selected
             $checked = '';
-            if ($story_count !== 'disable') {
-                if ($story_count === 'all' || $index < intval($story_count)) {
-                    $checked = 'checked';
-                }
+            if ($was_selected || ($story_count !== 'disable' && ($story_count === 'all' || $index < intval($story_count)))) {
+                $checked = 'checked';
             }
             
             // Check if post is scheduled
             $is_scheduled = $post->post_status === 'future';
             $scheduled_label = $is_scheduled ? '<span class="newsletter-status schedule" style="margin-left:10px;">SCHEDULED</span>' : '';
             
-            error_log("Processing post $post_id at index $index with story_count $story_count - checked: $checked");
+            error_log("Processing post $post_id at index $index with story_count $story_count - checked: $checked, was_selected: $was_selected");
             
             $html .= '<li data-post-id="' . esc_attr($post_id) . '">';
             $html .= '<span class="dashicons dashicons-sort story-drag-handle"></span>';

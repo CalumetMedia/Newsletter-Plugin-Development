@@ -24,31 +24,39 @@
     };
 
     // Save Blocks
-    window.saveBlocks = function() {
-        console.log('saveBlocks called');
-        var formData = $('#blocks-form').serializeArray();
-        formData.push({ name: 'action', value: 'save_newsletter_blocks' });
-        formData.push({ name: 'security', value: newsletterData.nonceSaveBlocks });
-        formData.push({ name: 'newsletter_slug', value: newsletterData.newsletterSlug });
+window.saveBlocks = function() {
+    console.log('saveBlocks called');
+    var $form = $('#blocks-form');
+    
+    // Create a FormData object to properly handle all form data
+    var formData = new FormData($form[0]);
+    formData.append('action', 'save_newsletter_blocks');
+    formData.append('security', newsletterData.nonceSaveBlocks);
+    formData.append('newsletter_slug', newsletterData.newsletterSlug);
 
-        $.ajax({
-            url: newsletterData.ajaxUrl,
-            method: 'POST',
-            dataType: 'json',
-            data: formData,
-            success: function(response) {
-                if (response.success) {
-                    updatePreview();
-                    alert(newsletterData.blocksSavedMessage || 'Blocks have been saved successfully.');
-                } else {
-                    alert(response.data);
-                }
-            },
-            error: function(xhr, status, error) {
-                alert('Error saving blocks: ' + error);
+    // Log the form data for debugging
+    console.log('Form data being sent:', Object.fromEntries(formData));
+
+    $.ajax({
+        url: newsletterData.ajaxUrl,
+        method: 'POST',
+        dataType: 'json',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(response) {
+            if (response.success) {
+                updatePreview();
+                alert('Newsletter blocks have been successfully saved.');
+            } else {
+                alert(response.data);
             }
-        });
-    };
+        },
+        error: function(xhr, status, error) {
+            alert('Error saving blocks: ' + error);
+        }
+    });
+};
 
     window.sendTestEmail = function(testEmail) {
         $.ajax({

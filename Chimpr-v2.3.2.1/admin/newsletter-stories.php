@@ -379,18 +379,6 @@ wp_localize_script('newsletter-admin-js', 'newsletterData', [
                             foreach ($blocks as $index => $block) {
                                 include NEWSLETTER_PLUGIN_DIR . 'admin/partials/block-item.php';
                             }
-                        } else {
-                            $index = 0;
-                            $block = [
-                                'type'        => 'content',
-                                'category'    => '',
-                                'title'       => '',
-                                'posts'       => [],
-                                'html'        => '',
-                                'template_id' => 'default',
-                                'story_count' => 'disable'
-                            ];
-                            include NEWSLETTER_PLUGIN_DIR . 'admin/partials/block-item.php';
                         }
                         ?>
                     </div>

@@ -11,19 +11,17 @@
             initDatepickers();
         }
 
-        // Initialize existing blocks with a slight delay to ensure everything is ready
-        setTimeout(function() {
-            $('.block-item').each(function() {
-                if (typeof initializeBlockEvents === 'function') {
-                    initializeBlockEvents($(this));
-                }
-            });
-
-            // Initial preview after blocks are initialized
-            if (typeof updatePreview === 'function') {
-                updatePreview();
+        // Initialize existing blocks
+        $('.block-item').each(function() {
+            if (typeof initializeBlockEvents === 'function') {
+                initializeBlockEvents($(this));
             }
-        }, 100);
+        });
+
+        // Initial preview
+        if (typeof updatePreview === 'function') {
+            updatePreview();
+        }
 
         // Tab persist
         var activeTab = localStorage.getItem('activeNewsletterTab');

@@ -1,120 +1,101 @@
 <?php
 if (!defined('ABSPATH')) {
-    exit;
+   exit;
 }
 
 function newsletter_handle_blocks_form_submission() {
-    check_ajax_referer('save_blocks_action', 'security');
+   check_ajax_referer('save_blocks_action', 'security');
 
-    $newsletter_slug = isset($_POST['newsletter_slug']) ? sanitize_text_field($_POST['newsletter_slug']) : 'default';
-    $blocks = isset($_POST['blocks']) ? wp_unslash($_POST['blocks']) : [];
-    $sanitized_blocks = [];
+   $newsletter_slug = isset($_POST['newsletter_slug']) ? sanitize_text_field($_POST['newsletter_slug']) : 'default';
+   $blocks = isset($_POST['blocks']) ? wp_unslash($_POST['blocks']) : [];
+   $sanitized_blocks = [];
 
-    foreach ($blocks as $block) {
-        // Basic block data sanitization
-        $sanitized_block = [
-            'type' => sanitize_text_field($block['type']),
-            'title' => sanitize_text_field($block['title']),
-            'template_id' => sanitize_text_field($block['template_id'] ?? 'default'),
-            'show_title' => isset($block['show_title']),
-            'date_range' => isset($block['date_range']) ? intval($block['date_range']) : 7,
-            'story_count' => isset($block['story_count']) ? sanitize_text_field($block['story_count']) : 'disable'
-        ];
+   error_log("Raw blocks data: " . print_r($blocks, true));
 
-        // Add debug logging
-        error_log('Saving block with story count: ' . $sanitized_block['story_count']);
+   // Get valid block indices (sequential numbers starting from 0)
+   $valid_indices = range(0, count(array_filter(array_keys($blocks), 'is_numeric')) - 1);
 
-        // Handle different block types
-        if ($block['type'] === 'content') {
-            $sanitized_block['category'] = isset($block['category']) ? intval($block['category']) : 0;
-            $sanitized_block['posts'] = [];
-            
-            if (!empty($block['posts']) && is_array($block['posts'])) {
-                // Sort posts by date (newest first)
-                $sorted_posts = [];
-                foreach ($block['posts'] as $post_id => $post_data) {
-                    $post_date = get_the_date('Y-m-d H:i:s', $post_id);
-                    $sorted_posts[$post_id] = [
-                        'date' => strtotime($post_date),
-                        'data' => $post_data
-                    ];
-                }
-                uasort($sorted_posts, function($a, $b) {
-                    return $b['date'] - $a['date'];
-                });
+   // Process each block with valid index
+   foreach ($valid_indices as $index) {
+       if (!isset($blocks[$index]) || !is_array($blocks[$index])) {
+           continue;
+       }
 
-                // Get the story count value
-                $story_count = $sanitized_block['story_count'];
-                $count = ($story_count === 'disable') ? 0 : intval($story_count);
-                
-                // Add posts to sanitized block
-                $current_count = 0;
-                foreach ($sorted_posts as $post_id => $post_info) {
-                    $post_data = $post_info['data'];
-                    // If story count is enabled and we haven't reached the limit,
-                    // or if the post was manually selected
-                    if (($count > 0 && $current_count < $count) || 
-                        (isset($post_data['selected']) && $post_data['selected'] == '1')) {
-                        
-                        $sanitized_block['posts'][$post_id] = [
-                            'selected' => true,
-                            'order' => isset($post_data['order']) ? intval($post_data['order']) : $current_count
-                        ];
-                        $current_count++;
-                    }
-                }
-            }
-        } elseif ($block['type'] === 'wysiwyg') {
-            // Handle WYSIWYG content
-            $content = isset($block['wysiwyg']) ? $block['wysiwyg'] : '';
-            
-            // Remove any WordPress auto-added slashes
-            $content = wp_unslash($content);
-            
-            // Add paragraphs if needed
-            if (!empty($content) && strpos($content, '<p>') === false) {
-                $content = wpautop($content);
-            }
-            
-            // Allow HTML but prevent XSS
-            $sanitized_block['wysiwyg'] = wp_kses_post($content);
-            
-        } elseif ($block['type'] === 'html') {
-            // Handle HTML content
-            $html_content = isset($block['html']) ? $block['html'] : '';
-            $html_content = wp_unslash($html_content);
-            $sanitized_block['html'] = wp_kses_post($html_content);
-        }
+       $block = $blocks[$index];
 
-        $sanitized_blocks[] = $sanitized_block;
-    }
+       // Create sanitized block with default values
+       $sanitized_block = [
+           'type' => sanitize_text_field($block['type'] ?? 'content'),
+           'title' => sanitize_text_field($block['title'] ?? ''),
+           'template_id' => sanitize_text_field($block['template_id'] ?? 'default'),
+           'show_title' => isset($block['show_title']),
+           'date_range' => isset($block['date_range']) ? intval($block['date_range']) : 7,
+           'story_count' => isset($block['story_count']) ? sanitize_text_field($block['story_count']) : 'all',
+           'category' => isset($block['category']) ? intval($block['category']) : 0,
+           'posts' => []
+       ];
 
-    // Save blocks
-    update_option("newsletter_blocks_$newsletter_slug", $sanitized_blocks);
+       // Handle content blocks
+       if (($block['type'] ?? 'content') === 'content') {
+           // Process posts if they exist
+           if (!empty($block['posts']) && is_array($block['posts'])) {
+               foreach ($block['posts'] as $post_id => $post_data) {
+                   if (!empty($post_data['selected'])) {
+                       $sanitized_block['posts'][$post_id] = [
+                           'selected' => true,
+                           'order' => isset($post_data['order']) ? intval($post_data['order']) : 0
+                       ];
+                   }
+               }
+           }
 
-    // Handle additional fields
-    if (isset($_POST['subject_line'])) {
-        update_option(
-            "newsletter_subject_line_$newsletter_slug", 
-            sanitize_text_field(wp_unslash($_POST['subject_line']))
-        );
-    }
+           // Sort posts by order if they exist
+           if (!empty($sanitized_block['posts'])) {
+               uasort($sanitized_block['posts'], function($a, $b) {
+                   return $a['order'] - $b['order'];
+               });
+           }
+       }
+       // Handle HTML blocks
+       else if (($block['type'] ?? '') === 'html') {
+           $sanitized_block['html'] = wp_kses_post($block['html'] ?? '');
+       }
+       // Handle WYSIWYG blocks
+       else if (($block['type'] ?? '') === 'wysiwyg') {
+           $sanitized_block['wysiwyg'] = wp_kses_post($block['wysiwyg'] ?? '');
+       }
 
-    if (isset($_POST['custom_header'])) {
-        update_option(
-            "newsletter_custom_header_$newsletter_slug", 
-            wp_kses_post(wp_unslash($_POST['custom_header']))
-        );
-    }
+       // Add the block regardless of content
+       $sanitized_blocks[] = $sanitized_block;
+   }
 
-    if (isset($_POST['custom_footer'])) {
-        update_option(
-            "newsletter_custom_footer_$newsletter_slug", 
-            wp_kses_post(wp_unslash($_POST['custom_footer']))
-        );
-    }
+   error_log("Final sanitized blocks to save: " . print_r($sanitized_blocks, true));
+   update_option("newsletter_blocks_$newsletter_slug", $sanitized_blocks);
 
-    wp_send_json_success('Blocks saved successfully');
+   // Handle additional fields
+   if (isset($_POST['subject_line'])) {
+       update_option(
+           "newsletter_subject_line_$newsletter_slug", 
+           sanitize_text_field(wp_unslash($_POST['subject_line']))
+       );
+   }
+
+   if (isset($_POST['custom_header'])) {
+       update_option(
+           "newsletter_custom_header_$newsletter_slug", 
+           wp_kses_post(wp_unslash($_POST['custom_header']))
+       );
+   }
+
+   if (isset($_POST['custom_footer'])) {
+       update_option(
+           "newsletter_custom_footer_$newsletter_slug", 
+           wp_kses_post(wp_unslash($_POST['custom_footer']))
+       );
+   }
+
+   // Return success
+   wp_send_json_success('Blocks saved successfully');
 }
 
 add_action('wp_ajax_save_newsletter_blocks', 'newsletter_handle_blocks_form_submission');

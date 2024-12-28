@@ -1,96 +1,89 @@
 (function($) {
-
-window.generatePreview = function() {
-    // Store the current state of all checkboxes and their order
-    var savedState = {};
-    $('.block-item').each(function() {
-        var $block = $(this);
-        var blockIndex = $block.data('index');
-        savedState[blockIndex] = {
-            storyCount: $block.find('.block-story-count').val(),
-            selections: {}
-        };
-        
-        // Store checkbox states
-        $block.find('input[type="checkbox"][name*="[posts]"][name*="[selected]"]').each(function() {
-            var $checkbox = $(this);
-            var postId = $checkbox.closest('li').data('post-id');
-            var $orderInput = $checkbox.closest('li').find('.post-order');
-            savedState[blockIndex].selections[postId] = {
-                checked: $checkbox.is(':checked'),
-                order: $orderInput.length ? $orderInput.val() : '0'
+    // Move generatePreview to global scope
+    window.generatePreview = function() {
+        var blocks = [];
+        $('.block-item').each(function() {
+            var block = $(this);
+            var blockData = {
+                type: block.find('.block-type').val(),
+                title: block.find('.block-title-input').val(),
+                show_title: block.find('.show-title-toggle').is(':checked'),
+                template_id: block.find('.block-template').val(),
+                story_count: block.find('.block-story-count').val()
             };
-        });
-    });
 
-    console.log('Stored state before preview:', savedState);
+            console.log('Collecting block data:', blockData);
 
-    var formData = $('#blocks-form').serializeArray();
-    formData.push({ name: 'action', value: 'generate_preview' });
-    formData.push({ name: 'newsletter_slug', value: newsletterData.newsletterSlug });
-    formData.push({ name: 'security', value: newsletterData.nonceGeneratePreview });
-    formData.push({ name: 'saved_selections', value: JSON.stringify(savedState) });
-
-    $.ajax({
-        url: newsletterData.ajaxUrl,
-        method: 'POST',
-        dataType: 'json',
-        data: formData,
-        success: function(response) {
-            if (response.success) {
-                $('#preview-content').html(response.data);
+            if (blockData.type === 'content') {
+                blockData.category = block.find('.block-category').val();
+                blockData.date_range = block.find('.block-date-range').val();
+                blockData.posts = {};
                 
-                // Restore state after a short delay to ensure the preview has loaded
-                setTimeout(function() {
-                    $('.block-item').each(function() {
-                        var $block = $(this);
-                        var blockIndex = $block.data('index');
-                        var state = savedState[blockIndex];
-                        
-                        if (state) {
-                            // Restore story count
-                            $block.find('.block-story-count').val(state.storyCount);
-                            
-                            // Restore checkbox states and orders
-                            Object.keys(state.selections).forEach(function(postId) {
-                                var selection = state.selections[postId];
-                                var $li = $block.find('li[data-post-id="' + postId + '"]');
-                                if ($li.length) {
-                                    var $checkbox = $li.find('input[type="checkbox"][name*="[selected]"]');
-                                    var $orderInput = $li.find('.post-order');
-                                    
-                                    if ($checkbox.length) {
-                                        $checkbox.prop('checked', selection.checked);
-                                    }
-                                    if ($orderInput.length) {
-                                        $orderInput.val(selection.order);
-                                    }
-                                }
-                            });
-                        }
-                    });
-                    console.log('Restored state after preview:', savedState);
-                }, 100);
-            } else {
-                $('#preview-content').html('<p>' + response.data + '</p>');
+                block.find('.post-checkbox:checked').each(function() {
+                    var $post = $(this);
+                    blockData.posts[$post.val()] = {
+                        selected: true,
+                        order: $post.closest('li').find('.post-order').val()
+                    };
+                });
+
+                console.log('Content block data:', {
+                    template_id: blockData.template_id,
+                    category: blockData.category,
+                    posts: Object.keys(blockData.posts).length + ' posts'
+                });
+            } else if (blockData.type === 'html' || blockData.type === 'wysiwyg') {
+                blockData.content = block.find('.html-block textarea, .wysiwyg-block textarea').val();
             }
-        },
-        error: function(xhr, status, error) {
-            $('#preview-content').html('<p>Error generating preview: ' + error + '</p>');
+            
+            blocks.push(blockData);
+        });
+
+        // Debug log
+        console.log('Newsletter Data available:', {
+            ajaxUrl: newsletterData.ajaxUrl,
+            security: newsletterData.security,
+            newsletterSlug: newsletterData.newsletterSlug
+        });
+
+        if (!newsletterData.security) {
+            console.error('Security nonce is not available in newsletterData');
+            return;
         }
-    });
-};
 
-// Single updatePreview function that all files will use
-window.updatePreview = function() {
-    // Prevent multiple rapid updates
-    if (window.updatePreviewTimeout) {
-        clearTimeout(window.updatePreviewTimeout);
-    }
-    
-    window.updatePreviewTimeout = setTimeout(function() {
-        generatePreview();
-    }, 100);
-};
-
+        $.ajax({
+            url: newsletterData.ajaxUrl,
+            method: 'POST',
+            data: {
+                action: 'generate_preview',
+                security: newsletterData.security,
+                newsletter_slug: newsletterData.newsletterSlug,
+                blocks: blocks,
+                custom_header: $('#custom_header').val(),
+                custom_footer: $('#custom_footer').val(),
+                custom_css: $('#custom_css').val()
+            },
+            success: function(response) {
+                if (response.success) {
+                    console.log('Received preview HTML:', response.data.html.substring(0, 500) + '...');
+                    $('#preview-container').html(response.data.html);
+                    console.log('Preview container updated');
+                    // Trigger event for accordion reinitialization
+                    $(document).trigger('previewUpdated');
+                } else {
+                    console.error('Preview generation failed:', response.data);
+                    alert('Failed to generate preview: ' + (response.data.message || 'Unknown error'));
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Ajax error generating preview:', {
+                    status: status,
+                    error: error,
+                    response: xhr.responseText
+                });
+                alert('Error generating preview. Check console for details.');
+            }
+        });
+    };
 })(jQuery);
+    

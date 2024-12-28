@@ -1,17 +1,20 @@
 (function($) {
 
+// Initialize accordion
 $(document).ready(function() {
-    // Initialize jQuery UI Accordion on the blocks container
-    $("#blocks-container").accordion({
-        header: ".block-header",
-        collapsible: true,
-        active: false,
-        heightStyle: "content"
+    // First destroy any existing accordion
+    if ($("#blocks-container").data('ui-accordion')) {
+        $("#blocks-container").accordion('destroy');
+    }
+
+    // Initialize accordion
+    $(".block-header").on('click', function(e) {
+        e.preventDefault();
+        var $content = $(this).closest('.block-item').find('.block-content');
+        $('.block-content').not($content).slideUp();
+        $content.slideToggle();
     });
 });
-
-// Remove the previous slideToggle handler for block-accordion-toggle
-// because the accordion widget will handle expand/collapse.
 
 // Sortable initialization for main container
 $(function() {
@@ -63,6 +66,12 @@ $(document).off('change.newsletter', '.block-category, .block-date-range-select,
         }
     });
 
+// Add handlers for template, story count, and post selection changes
+$(document).off('change.newsletter', '.block-template, .block-story-count, .post-checkbox')
+    .on('change.newsletter', '.block-template, .block-story-count, .post-checkbox', function() {
+        updatePreview();
+    });
+
 // Test email dialog
 $(document).off('click', '#send-test-email').on('click', '#send-test-email', function(e) {
     e.preventDefault();
@@ -90,7 +99,7 @@ $(document).off('click', '#send-test').on('click', '#send-test', function() {
     sendTestEmail(testEmail);
 });
 
-// Save Blocks - allow normal form submission to trigger the redirect
+// Save Blocks
 $(document).off('click', '#save-blocks').on('click', '#save-blocks', function(e) {
     console.log('Save button clicked');
     e.preventDefault();
@@ -150,43 +159,5 @@ $(document).off('change', '#manual_schedule_date, #manual_schedule_time')
         }
     });
 
-// Schedule Campaign
-$(document).off('click', '#schedule-campaign').on('click', '#schedule-campaign', function() {
-    var now = new Date();
-    var minutes = now.getMinutes();
-    var roundedMinutes = Math.ceil((minutes + 10) / 15) * 15;
-    now.setMinutes(roundedMinutes);
-    now.setSeconds(0);
-
-    var tzoffset = now.getTimezoneOffset() * 60000;
-    var localISOTime = (new Date(now - tzoffset)).toISOString().slice(0, -8);
-
-    var confirmSchedule = confirm("Are you sure you want to schedule the campaign?");
-    if (!confirmSchedule) {
-        return;
-    }
-
-    $.ajax({
-        url: newsletterData.ajaxUrl,
-        method: 'POST',
-        data: {
-            action: 'schedule_mailchimp_campaign',
-            security: newsletterData.nonceMailchimp,
-            newsletter_slug: newsletterData.newsletterSlug,
-            schedule_datetime: localISOTime
-        },
-        success: function(response) {
-            if (response.success) {
-                alert(response.data.message);
-                location.reload();
-            } else {
-                alert("Error scheduling campaign: " + (response.data ? response.data : 'Unknown error'));
-            }
-        },
-        error: function(xhr, status, error) {
-            alert("Ajax error scheduling campaign: " + error);
-        }
-    });
-});
-
 })(jQuery);
+    

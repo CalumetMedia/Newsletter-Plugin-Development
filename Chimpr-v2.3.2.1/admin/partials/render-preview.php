@@ -64,49 +64,6 @@ function get_newsletter_blocks_by_slug($slug) {
         update_option($blocks_option, $blocks);
     }
 
-    // Process each content block to maintain selected posts
-    foreach ($blocks as &$block) {
-        if ($block['type'] === 'content') {
-            $story_count = isset($block['story_count']) ? $block['story_count'] : 'disable';
-            $count = ($story_count === 'disable') ? 0 : intval($story_count);
-            
-            // If there are saved post selections, maintain them
-            if (!empty($block['posts'])) {
-                $selected_posts = $block['posts'];
-                
-                // Get all available posts for the block's category and date range
-                $args = array(
-                    'posts_per_page' => -1,
-                    'category' => $block['category'],
-                    'date_query' => array(
-                        'after' => date('Y-m-d', strtotime("-{$block['date_range']} days"))
-                    ),
-                    'orderby' => 'date',
-                    'order' => 'DESC'
-                );
-                
-                $query = new WP_Query($args);
-                $current_count = 0;
-                
-                foreach ($query->posts as $post) {
-                    $post_id = $post->ID;
-                    // Keep existing selections or add new ones based on story count
-                    if (isset($selected_posts[$post_id]) || 
-                        ($count > 0 && $current_count < $count)) {
-                        $block['posts'][$post_id] = [
-                            'selected' => true,
-                            'order' => isset($selected_posts[$post_id]['order']) 
-                                ? $selected_posts[$post_id]['order'] 
-                                : $current_count
-                        ];
-                        $current_count++;
-                    }
-                }
-            }
-        }
-    }
-    unset($block);
-
     return $blocks;
 }
 

@@ -1,0 +1,70 @@
+/* newsletter-phone.css */
+
+/* Phone Preview Container */
+#story-preview {
+    position: relative;
+    width: 444px;
+    height: 870px;
+    margin: 0 auto;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 30px;
+    overflow: hidden;
+    background-color: #000; /* Optional: Highlights the phone frame */
+}
+
+#phone-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 444px;
+    height: 870px;
+    pointer-events: none; /* Allows clicks to pass through the image */
+    z-index: 1; /* Place the overlay below the content */
+}
+
+#preview-content {
+    position: absolute;
+    top: 26px; /* Aligns with the top padding inside the phone image */
+    left: 33.5px; /* Centers the preview within the phone image */
+    width: 377px;
+    height: 818px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background-color: #fff; /* Differentiates the content area */
+    border-radius: 10px;
+    padding: 10px;
+    box-sizing: border-box;
+    z-index: 2; /* Ensure content is above the phone image */
+}
+
+#story-preview h2 {
+    font-size: 22px;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+/* Scoped Styles for Newsletter Preview Content */
+#preview-content .newsletter-preview * {
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    #story-preview {
+        width: 300px;
+        height: 600px;
+    }
+
+    #phone-overlay {
+        width: 300px;
+        height: 600px;
+    }
+
+    #preview-content {
+        top: 20px;
+        left: 15px;
+        width: 270px;
+        height: 560px;
+    }
+}

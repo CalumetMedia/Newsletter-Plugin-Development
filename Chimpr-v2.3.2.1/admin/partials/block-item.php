@@ -3,6 +3,7 @@ if (!defined('ABSPATH')) exit;
 
 if (!isset($block) || !isset($index)) return;
 
+$block_index = $index;
 $available_templates = get_option('newsletter_templates', []);
 $block_templates = array_filter($available_templates, function($template) {
     return isset($template['type']) && $template['type'] === 'block';
@@ -22,13 +23,14 @@ if (!isset($block_templates['default'])) {
 ?>
 
 <div class="block-item" data-index="<?php echo esc_attr($index); ?>">
-    <h3 class="block-header">
-        <div style="display: flex; align-items: center; width: 100%;">
-            <span class="dashicons dashicons-sort block-drag-handle"></span>
-            <span class="block-title" style="flex: 1; font-size: 14px; margin: 0 10px;"><?php echo esc_html($block['title'] ?: __('Block', 'newsletter')); ?></span>
-            <!-- Removed the accordion toggle arrow icon here -->
-        </div>
-    </h3>
+    <div class="block-header-wrapper">
+        <h3 class="block-header">
+            <div style="display: flex; align-items: center; width: 100%;">
+                <span class="dashicons dashicons-sort block-drag-handle"></span>
+                <span class="block-title" style="flex: 1; font-size: 14px; margin: 0 10px;"><?php echo esc_html($block['title'] ?: __('Block', 'newsletter')); ?></span>
+            </div>
+        </h3>
+    </div>
     <div class="block-content">
         <!-- Title Row -->
 <div class="title-row" style="display: flex; align-items: center; margin-bottom: 10px;">
@@ -126,7 +128,6 @@ if (!isset($block_templates['default'])) {
             <select name="blocks[<?php echo esc_attr($index); ?>][story_count]" 
                     class="block-story-count" 
                     style="width: 200px; height: 36px; line-height: 1.4; padding: 0 6px;">
-                <option value="disable" <?php selected($current_story_count, 'disable'); ?>><?php esc_html_e('Manual Selection', 'newsletter'); ?></option>
                 <option value="all" <?php selected($current_story_count, 'all'); ?>><?php esc_html_e('All', 'newsletter'); ?></option>
                 <?php for ($i = 1; $i <= 10; $i++) : ?>
                     <option value="<?php echo $i; ?>" <?php selected($current_story_count, $i); ?>><?php echo $i; ?></option>
@@ -191,35 +192,64 @@ if (!isset($block_templates['default'])) {
                         'numberposts' => 20,
                         'orderby'     => 'date',
                         'order'       => 'DESC',
-                        'post_status' => 'publish'
+                        'post_status' => ['publish', 'future']
                     ];
+
+                    // Add date range filter
+                    $date_range = isset($block['date_range']) ? intval($block['date_range']) : 7;
+                    if ($date_range > 0) {
+                        $today = current_time('Y-m-d');
+                        $posts_args['date_query'] = [
+                            'relation' => 'OR',
+                            ['after' => date('Y-m-d', strtotime("-{$date_range} days")), 'before' => $today, 'inclusive' => true],
+                            ['after' => $today, 'before' => date('Y-m-d', strtotime("+1 year")), 'inclusive' => true]
+                        ];
+                    }
 
                     $posts = get_posts($posts_args);
 
                     if ($posts) {
-                        $selected_posts = isset($block['posts']) ? $block['posts'] : [];
-                        usort($posts, function ($a, $b) use ($selected_posts) {
-                            $order_a = isset($selected_posts[$a->ID]['order']) ? intval($selected_posts[$a->ID]['order']) : PHP_INT_MAX;
-                            $order_b = isset($selected_posts[$b->ID]['order']) ? intval($selected_posts[$b->ID]['order']) : PHP_INT_MAX;
-                            return $order_a - $order_b;
+                        // Sort posts by date first
+                        usort($posts, function($a, $b) {
+                            return strtotime($b->post_date) - strtotime($a->post_date);
                         });
+
                         echo '<ul class="sortable-posts">';
-                        foreach ($posts as $post) {
+                        foreach ($posts as $index => $post) {
                             $post_id = $post->ID;
-                            $checked = isset($selected_posts[$post_id]['selected']) ? 'checked' : '';
+                            
+                            // Auto-check based on story count
+                            $checked = '';
+                            if ($current_story_count === 'all' || $index < intval($current_story_count)) {
+                                $checked = 'checked';
+                            }
+                            
                             $thumbnail_url = get_the_post_thumbnail_url($post_id, 'thumbnail') ?: '';
-                            $order = isset($selected_posts[$post_id]['order']) ? intval($selected_posts[$post_id]['order']) : PHP_INT_MAX;
+                            $order = $index;
+                            $is_scheduled = $post->post_status === 'future';
+                            $post_date = get_the_date('M j, Y g:i A', $post);
                             ?>
                             <li data-post-id="<?php echo esc_attr($post_id); ?>">
                                 <span class="dashicons dashicons-sort story-drag-handle" style="cursor: move; margin-right: 10px;"></span>
                                 <label>
-                                    <input type="checkbox" name="blocks[<?php echo esc_attr($index); ?>][posts][<?php echo esc_attr($post_id); ?>][selected]" value="1" <?php echo $checked; ?>> 
+                                    <input type="checkbox" 
+                                           name="blocks[<?php echo esc_attr($block_index); ?>][posts][<?php echo esc_attr($post_id); ?>][selected]" 
+                                           value="1" <?php echo $checked; ?>> 
                                     <?php if ($thumbnail_url): ?>
-                                        <img src="<?php echo esc_url($thumbnail_url); ?>" alt="<?php echo esc_attr($post->post_title); ?>" style="width:50px; height:auto; margin-right:10px; vertical-align: middle;">
+                                        <img src="<?php echo esc_url($thumbnail_url); ?>" 
+                                             alt="<?php echo esc_attr($post->post_title); ?>" 
+                                             style="width:50px; height:auto; margin-right:10px; vertical-align: middle;">
                                     <?php endif; ?>
-                                    <?php echo esc_html($post->post_title); ?>
+                                    <span class="post-title"><?php echo esc_html($post->post_title); 
+                                    if ($is_scheduled): ?>
+                                        <span class="scheduled-label" style="display: inline-block; background: #e5e5e5; color: #135e96; padding: 2px 8px; border-radius: 3px; font-size: 12px; margin-left: 8px;">Scheduled for <?php echo esc_html($post_date); ?></span>
+                                    <?php endif; ?>
+                                    </span>
                                 </label>
-                                <input type="hidden" class="post-order" name="blocks[<?php echo esc_attr($index); ?>][posts][<?php echo esc_attr($post_id); ?>][order]" value="<?php echo esc_attr($order); ?>">
+                                <input type="hidden" 
+                                       class="post-order" 
+                                       name="blocks[<?php echo esc_attr($block_index); ?>][posts][<?php echo esc_attr($post_id); ?>][order]" 
+                                       value="<?php echo esc_attr($order); ?>">
                             </li>
                             <?php
                         }

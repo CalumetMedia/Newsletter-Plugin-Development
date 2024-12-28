@@ -2,17 +2,27 @@
 // includes/ajax/ajax-generate-preview.php
 if (!defined('ABSPATH')) exit;
 
+// Hook up AJAX handlers for both logged in and non-logged in users
+add_action('wp_ajax_generate_preview', 'newsletter_generate_preview');
+add_action('wp_ajax_nopriv_generate_preview', 'newsletter_generate_preview');
+
 /**
  * AJAX Handler to Generate Preview
  */
 function newsletter_generate_preview() {
-    check_ajax_referer('generate_preview_nonce', 'security');
+    if (!isset($_POST['security'])) {
+        error_log('Security nonce is missing in preview request');
+        wp_send_json_error('Security nonce is missing');
+        return;
+    }
+
+    if (!check_ajax_referer('generate_preview_nonce', 'security', false)) {
+        error_log('Security nonce verification failed for preview request');
+        wp_send_json_error('Security check failed');
+        return;
+    }
 
     $newsletter_slug = isset($_POST['newsletter_slug']) ? sanitize_text_field($_POST['newsletter_slug']) : 'default';
-    
-    // Get both saved blocks and current selections
-    $saved_blocks = get_option("newsletter_blocks_$newsletter_slug", []);
-    $saved_selections = isset($_POST['saved_selections']) ? json_decode(stripslashes($_POST['saved_selections']), true) : [];
 
     $blocks = isset($_POST['blocks']) ? $_POST['blocks'] : [];
     $custom_header = isset($_POST['custom_header']) ? wp_kses_post($_POST['custom_header']) : '';
@@ -30,7 +40,7 @@ function newsletter_generate_preview() {
     }
 
     $sanitized_blocks = [];
-    foreach ($blocks as $index => $block) {
+    foreach ($blocks as $block) {
         $sanitized_block = [
             'type'        => sanitize_text_field($block['type']),
             'title'       => sanitize_text_field($block['title']),
@@ -42,83 +52,31 @@ function newsletter_generate_preview() {
 
         if ($sanitized_block['type'] === 'content') {
             $sanitized_block['category'] = isset($block['category']) ? intval($block['category']) : 0;
+            $sanitized_block['post_count'] = isset($block['post_count']) ? intval($block['post_count']) : 5;
             $sanitized_block['date_range'] = isset($block['date_range']) ? intval($block['date_range']) : 7;
             $sanitized_block['posts'] = [];
-
-            // Get current selections and saved posts
-            $current_selections = isset($saved_selections[$index]['posts']) ? $saved_selections[$index]['posts'] : [];
-            $saved_posts = [];
-            foreach ($saved_blocks as $saved_block) {
-                if ($saved_block['title'] === $sanitized_block['title'] && $saved_block['type'] === 'content') {
-                    $saved_posts = $saved_block['posts'] ?? [];
-                    break;
-                }
-            }
-            
             if (!empty($block['posts'])) {
-                // Get all posts for this category and date range
-                $args = array(
-                    'posts_per_page' => -1,
-                    'category' => $sanitized_block['category'],
-                    'date_query' => array(
-                        'after' => date('Y-m-d', strtotime("-{$sanitized_block['date_range']} days"))
-                    ),
-                    'orderby' => 'date',
-                    'order' => 'DESC'
-                );
-                
-                $query = new WP_Query($args);
-                $posts = $query->posts;
-                
-                // Handle story count and selections
-                $story_count = $sanitized_block['story_count'];
-                $count = ($story_count === 'disable') ? 0 : intval($story_count);
-                $current_count = 0;
-
-                foreach ($posts as $post) {
-                    $post_id = $post->ID;
-                    
-                    // Post should be selected if:
-                    // 1. It's in current selections (manually checked)
-                    // 2. It's in saved posts (previously saved)
-                    // 3. It should be preselected based on story count
-                    if (isset($current_selections[$post_id]) || 
-                        isset($saved_posts[$post_id]) ||
-                        ($count > 0 && $current_count < $count)) {
-                        
+                foreach ($block['posts'] as $post_id => $post_data) {
+                    if (!empty($post_data['selected'])) {
                         $sanitized_block['posts'][$post_id] = [
                             'selected' => true,
-                            'order' => isset($current_selections[$post_id]['order']) 
-                                ? intval($current_selections[$post_id]['order'])
-                                : (isset($saved_posts[$post_id]['order']) 
-                                    ? intval($saved_posts[$post_id]['order'])
-                                    : $current_count)
+                            'order' => intval($post_data['order'] ?? 0)
                         ];
-                        $current_count++;
                     }
                 }
             }
-        } elseif ($sanitized_block['type'] === 'html') {
-            $sanitized_block['html'] = wp_kses_post($block['html'] ?? '');
-        } elseif ($sanitized_block['type'] === 'wysiwyg') {
-            $sanitized_block['wysiwyg'] = wp_kses_post($block['wysiwyg'] ?? '');
+        } else if ($sanitized_block['type'] === 'html' || $sanitized_block['type'] === 'wysiwyg') {
+            $sanitized_block['content'] = wp_kses_post($block['content'] ?? '');
         }
-
+        
         $sanitized_blocks[] = $sanitized_block;
     }
 
-    $preview_content = newsletter_generate_preview_content($newsletter_slug, $sanitized_blocks);
+    // Generate preview HTML
+    $preview_html = newsletter_generate_preview_content($newsletter_slug, $sanitized_blocks);
 
-    $preview_html = '<div class="newsletter-preview-container">';
-    if (!empty($custom_css)) {
-        $preview_html .= '<style type="text/css">';
-        $preview_html .= '.newsletter-preview-container {' . $custom_css . '}';
-        $preview_html .= '</style>';
-    }
-    $preview_html .= '<div class="newsletter-content">';
-    $preview_html .= $preview_content;
-    $preview_html .= '</div></div>';
+    // Debug log the preview HTML
+    error_log('Preview HTML generated: ' . substr($preview_html, 0, 500) . '...');
 
-    wp_send_json_success($preview_html);
+    wp_send_json_success(['html' => $preview_html]);
 }
-add_action('wp_ajax_generate_preview', 'newsletter_generate_preview');

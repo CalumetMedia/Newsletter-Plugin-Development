@@ -97,40 +97,49 @@ if (!isset($block_templates['default'])) {
     </div>
         </div>
 
-        <!-- Date Range Selector -->
-        <div class="date-range-row" style="margin-bottom: 10px;" <?php if ($block['type'] === 'html' || $block['type'] === 'wysiwyg') echo 'style="display:none;"'; ?>>
-            <label><?php esc_html_e('Date Range:', 'newsletter'); ?></label>
-            <select name="blocks[<?php echo esc_attr($index); ?>][date_range]" 
-                    class="block-date-range" 
-                    style="width: 200px; height: 36px; line-height: 1.4; padding: 0 6px;">
-                <option value="1" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 1); ?>><?php esc_html_e('Previous 1 Day', 'newsletter'); ?></option>
-                <option value="2" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 2); ?>><?php esc_html_e('Previous 2 Days', 'newsletter'); ?></option>
-                <option value="3" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 3); ?>><?php esc_html_e('Previous 3 Days', 'newsletter'); ?></option>
-                <option value="5" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 5); ?>><?php esc_html_e('Previous 5 Days', 'newsletter'); ?></option>
-                <option value="7" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 7); ?>><?php esc_html_e('Previous 7 Days', 'newsletter'); ?></option>
-                <option value="14" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 14); ?>><?php esc_html_e('Previous 14 Days', 'newsletter'); ?></option>
-                <option value="30" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 30); ?>><?php esc_html_e('Previous 30 Days', 'newsletter'); ?></option>
-                <option value="60" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 60); ?>><?php esc_html_e('Previous 60 Days', 'newsletter'); ?></option>
-                <option value="90" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 90); ?>><?php esc_html_e('Previous 90 Days', 'newsletter'); ?></option>
-                <option value="0" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 0); ?>><?php esc_html_e('All', 'newsletter'); ?></option>
-            </select>
-        </div>
+        <!-- Date Range and Story Count Row -->
+        <div class="date-range-row" style="display: flex; gap: 15px; margin-bottom: 10px;" <?php if ($block['type'] === 'html' || $block['type'] === 'wysiwyg') echo 'style="display:none;"'; ?>>
+            <div>
+                <label><?php esc_html_e('Date Range:', 'newsletter'); ?></label>
+                <select name="blocks[<?php echo esc_attr($index); ?>][date_range]" 
+                        class="block-date-range" 
+                        style="width: 200px; height: 36px; line-height: 1.4; padding: 0 6px;">
+                    <option value="1" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 1); ?>><?php esc_html_e('Previous 1 Day', 'newsletter'); ?></option>
+                    <option value="2" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 2); ?>><?php esc_html_e('Previous 2 Days', 'newsletter'); ?></option>
+                    <option value="3" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 3); ?>><?php esc_html_e('Previous 3 Days', 'newsletter'); ?></option>
+                    <option value="5" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 5); ?>><?php esc_html_e('Previous 5 Days', 'newsletter'); ?></option>
+                    <option value="7" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 7); ?>><?php esc_html_e('Previous 7 Days', 'newsletter'); ?></option>
+                    <option value="14" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 14); ?>><?php esc_html_e('Previous 14 Days', 'newsletter'); ?></option>
+                    <option value="30" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 30); ?>><?php esc_html_e('Previous 30 Days', 'newsletter'); ?></option>
+                    <option value="60" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 60); ?>><?php esc_html_e('Previous 60 Days', 'newsletter'); ?></option>
+                    <option value="90" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 90); ?>><?php esc_html_e('Previous 90 Days', 'newsletter'); ?></option>
+                    <option value="0" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 0); ?>><?php esc_html_e('All', 'newsletter'); ?></option>
+                </select>
+            </div>
 
-        <!-- Story Count Selector -->
-        <div class="story-count-row" style="margin-bottom: 10px;" <?php if ($block['type'] === 'html' || $block['type'] === 'wysiwyg') echo 'style="display:none;"'; ?>>
-            <?php
-            $current_story_count = isset($block['story_count']) ? $block['story_count'] : 'disable';
-            error_log('Rendering story count selector with current value: ' . $current_story_count);
-            ?>
-            <label><?php esc_html_e('Number of Stories:', 'newsletter'); ?></label>
-            <select name="blocks[<?php echo esc_attr($index); ?>][story_count]" 
-                    class="block-story-count" 
-                    style="width: 200px; height: 36px; line-height: 1.4; padding: 0 6px;">
-                <option value="disable" <?php selected($current_story_count, 'disable'); ?>><?php esc_html_e('All', 'newsletter'); ?></option>
-                <?php for ($i = 1; $i <= 10; $i++) : ?>
-                    <option value="<?php echo $i; ?>" <?php selected($current_story_count, $i); ?>><?php echo $i; ?></option>
-                <?php endfor; ?>
-            </select>
+            <div>
+                <?php $current_story_count = isset($block['story_count']) ? $block['story_count'] : 'disable'; ?>
+                <label><?php esc_html_e('Number of Stories:', 'newsletter'); ?></label>
+                <select name="blocks[<?php echo esc_attr($index); ?>][story_count]" 
+                        class="block-story-count" 
+                        style="width: 200px; height: 36px; line-height: 1.4; padding: 0 6px;">
+                    <option value="disable" <?php selected($current_story_count, 'disable'); ?>><?php esc_html_e('All', 'newsletter'); ?></option>
+                    <?php for ($i = 1; $i <= 10; $i++) : ?>
+                        <option value="<?php echo $i; ?>" <?php selected($current_story_count, $i); ?>><?php echo $i; ?></option>
+                    <?php endfor; ?>
+                </select>
+            </div>
+
+            <div style="display: flex; align-items: flex-end; padding-bottom: 8px;">
+                <label>
+                    <input type="checkbox" 
+                           name="blocks[<?php echo esc_attr($index); ?>][manual_override]" 
+                           class="manual-override-toggle" 
+                           value="1" 
+                           <?php checked(isset($block['manual_override']) && $block['manual_override']); ?>>
+                    <?php esc_html_e('Manual Override Stories', 'newsletter'); ?>
+                </label>
+            </div>
         </div>
 
         <!-- WYSIWYG Block -->
@@ -177,8 +186,6 @@ if (!isset($block_templates['default'])) {
 
         <!-- Content Block Section -->
         <div class="content-block" <?php if ($block['type'] !== 'content') echo 'style="display:none;"'; ?>>
-
-
             <!-- Posts Selection Section -->
             <div class="block-posts">
                 <h4><?php esc_html_e('Posts:', 'newsletter'); ?></h4>
@@ -202,7 +209,7 @@ if (!isset($block_templates['default'])) {
                             $order_b = isset($selected_posts[$b->ID]['order']) ? intval($selected_posts[$b->ID]['order']) : PHP_INT_MAX;
                             return $order_a - $order_b;
                         });
-                        echo '<ul class="sortable-posts">';
+                        echo '<ul class="sortable-posts" ' . (!isset($block['manual_override']) || !$block['manual_override'] ? 'style="pointer-events: none; opacity: 0.7;"' : '') . '>';
                         foreach ($posts as $post) {
                             $post_id = $post->ID;
                             $checked = isset($selected_posts[$post_id]['selected']) ? 'checked' : '';
@@ -212,7 +219,11 @@ if (!isset($block_templates['default'])) {
                             <li data-post-id="<?php echo esc_attr($post_id); ?>">
                                 <span class="dashicons dashicons-sort story-drag-handle" style="cursor: move; margin-right: 10px;"></span>
                                 <label>
-                                    <input type="checkbox" name="blocks[<?php echo esc_attr($index); ?>][posts][<?php echo esc_attr($post_id); ?>][selected]" value="1" <?php echo $checked; ?>> 
+                                    <input type="checkbox" 
+                                           name="blocks[<?php echo esc_attr($index); ?>][posts][<?php echo esc_attr($post_id); ?>][selected]" 
+                                           value="1" 
+                                           <?php echo $checked; ?>
+                                           <?php echo (!isset($block['manual_override']) || !$block['manual_override'] ? 'disabled' : ''); ?>> 
                                     <?php if ($thumbnail_url): ?>
                                         <img src="<?php echo esc_url($thumbnail_url); ?>" alt="<?php echo esc_attr($post->post_title); ?>" style="width:50px; height:auto; margin-right:10px; vertical-align: middle;">
                                     <?php endif; ?>
@@ -232,6 +243,51 @@ if (!isset($block_templates['default'])) {
                 ?>
             </div>
         </div>
+
+        <!-- Add JavaScript for manual override functionality -->
+        <script>
+        jQuery(document).ready(function($) {
+            var blockIndex = <?php echo esc_js($index); ?>;
+            var $manualOverride = $('input[name="blocks[' + blockIndex + '][manual_override]"]');
+            var $postsList = $manualOverride.closest('.block-item').find('.sortable-posts');
+            var $checkboxes = $postsList.find('input[type="checkbox"]');
+            
+            // Function to update the interactive state
+            function updateInteractiveState(isManual) {
+                // Update visual state
+                $postsList.css({
+                    'pointer-events': isManual ? 'auto' : 'none',
+                    'opacity': isManual ? '1' : '0.7'
+                });
+                
+                // Enable/disable checkboxes
+                $checkboxes.prop('disabled', !isManual);
+                
+                // Update drag handles cursor
+                $postsList.find('.story-drag-handle').css('cursor', isManual ? 'move' : 'default');
+            }
+
+            // Initialize the state based on current manual override value
+            updateInteractiveState($manualOverride.prop('checked'));
+
+            // Handle manual override toggle
+            $manualOverride.on('change', function() {
+                var isManual = $(this).prop('checked');
+                updateInteractiveState(isManual);
+                
+                // If switching to automatic mode, trigger a reload of posts
+                if (!isManual) {
+                    const dateRange = $(this).closest('.block-item').find('.block-date-range').val();
+                    const categoryId = $(this).closest('.block-item').find('.block-category').val();
+                    const storyCount = $(this).closest('.block-item').find('.block-story-count').val();
+                    
+                    if (categoryId) {
+                        window.loadBlockPosts($(this).closest('.block-item'), categoryId, blockIndex, dateRange, storyCount);
+                    }
+                }
+            });
+        });
+        </script>
 
         <!-- HTML Block Section -->
         <div class="html-block" <?php if ($block['type'] !== 'html') echo 'style="display:none;"'; ?>>

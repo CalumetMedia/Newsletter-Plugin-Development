@@ -35,30 +35,61 @@
                 sortableList.sortable('destroy');
             }
             
+            // Check manual override state
+            var blockIndex = block.data('index');
+            var manualOverride = block.find('input[name="blocks[' + blockIndex + '][manual_override]"]').prop('checked');
+            
+            // Initialize sortable
             sortableList.sortable({
                 handle: '.story-drag-handle',
+                items: '> li',
+                axis: 'y',
+                cursor: 'move',
+                containment: 'parent',
+                tolerance: 'pointer',
+                disabled: !manualOverride,
+                cancel: !manualOverride ? "*" : "", // Prevent any interaction when disabled
                 update: function(event, ui) {
-                    console.log('Sortable update triggered');
-                    if (globalUpdateInProgress) {
-                        console.log('Update in progress, skipping...');
-                        return;
+                    if (!manualOverride) {
+                        // If manual override is disabled, prevent sorting and revert
+                        sortableList.sortable('cancel');
+                        return false;
                     }
                     
-                    var $block = ui.item.closest('.block-item');
-                    console.log('Updating post orders...');
+                    console.log('Sortable update triggered');
                     
-                    sortableList.find('li').each(function(index) {
+                    // Update order values after sorting
+                    sortableList.find('> li').each(function(index) {
                         $(this).find('.post-order').val(index);
                     });
                     
-                    console.log('Triggering preview update for sortable change');
-                    globalUpdateInProgress = true;
-                    setTimeout(() => {
-                        updatePreview('sortable_update');
-                        globalUpdateInProgress = false;
-                    }, 250);
+                    // Trigger preview update
+                    if (!globalUpdateInProgress) {
+                        globalUpdateInProgress = true;
+                        setTimeout(() => {
+                            updatePreview('sortable_update');
+                            globalUpdateInProgress = false;
+                        }, 250);
+                    }
                 }
+            }).disableSelection();
+
+            // Set initial visual state
+            sortableList.css({
+                'pointer-events': manualOverride ? 'auto' : 'none',
+                'opacity': manualOverride ? '1' : '0.7'
             });
+            
+            // Set initial checkbox state
+            sortableList.find('input[type="checkbox"]').prop('disabled', !manualOverride);
+            
+            // Set initial cursor state for drag handles
+            sortableList.find('.story-drag-handle').css('cursor', manualOverride ? 'move' : 'default');
+            
+            // If not manual override, ensure items can't be dragged
+            if (!manualOverride) {
+                sortableList.sortable('disable');
+            }
         }
     };
 
@@ -152,6 +183,39 @@
                 }, 250);
             });
 
+        // Add manual override change handler
+        block.find('input[name*="[manual_override]"]').off('change').on('change', function() {
+            var isManual = $(this).prop('checked');
+            var $postsList = block.find('.sortable-posts');
+            
+            // Update sortable state
+            $postsList.sortable('option', 'disabled', !isManual);
+            
+            // Update visual state
+            $postsList.css({
+                'pointer-events': isManual ? 'auto' : 'none',
+                'opacity': isManual ? '1' : '0.7'
+            });
+            
+            // Update checkboxes
+            $postsList.find('input[type="checkbox"]').prop('disabled', !isManual);
+            
+            // Update drag handles
+            $postsList.find('.story-drag-handle').css('cursor', isManual ? 'move' : 'default');
+            
+            // If switching to automatic mode, trigger a reload of posts
+            if (!isManual) {
+                const dateRange = block.find('.block-date-range').val();
+                const categoryId = block.find('.block-category').val();
+                const blockIndex = block.data('index');
+                const storyCount = block.find('.block-story-count').val();
+                
+                if (categoryId) {
+                    loadBlockPosts(block, categoryId, blockIndex, dateRange, storyCount);
+                }
+            }
+        });
+
         // Story count change handler
         block.find('.block-story-count').off('change').on('change', function() {
             if (globalUpdateInProgress) return;
@@ -237,20 +301,23 @@
     };
 
     // Load block posts via AJAX
-    window.loadBlockPosts = function(block, categoryId, currentIndex, dateRange, storyCount) {
+    window.loadBlockPosts = function(block, categoryId, currentIndex, dateRange, storyCount, manualOverride) {
         // Get current selections for this block
         var savedSelections = {};
         
-        // First get any checked checkboxes
-        block.find('input[type="checkbox"][name*="[posts]"][name*="[selected]"]:checked').each(function() {
-            var $checkbox = $(this);
-            var postId = $checkbox.closest('li').data('post-id');
-            var $orderInput = $checkbox.closest('li').find('.post-order');
-            savedSelections[postId] = {
-                selected: true,
-                order: $orderInput.length ? $orderInput.val() : '0'
-            };
-        });
+        // Only get saved selections if manual override is enabled
+        if (manualOverride) {
+            // First get any checked checkboxes
+            block.find('input[type="checkbox"][name*="[posts]"][name*="[selected]"]:checked').each(function() {
+                var $checkbox = $(this);
+                var postId = $checkbox.closest('li').data('post-id');
+                var $orderInput = $checkbox.closest('li').find('.post-order');
+                savedSelections[postId] = {
+                    selected: true,
+                    order: $orderInput.length ? $orderInput.val() : '0'
+                };
+            });
+        }
 
         var data = {
             action: 'load_block_posts',
@@ -260,7 +327,8 @@
             date_range: dateRange,
             story_count: storyCount,
             newsletter_slug: newsletterData.newsletterSlug,
-            saved_selections: JSON.stringify(savedSelections)
+            saved_selections: JSON.stringify(savedSelections),
+            manual_override: manualOverride
         };
 
         console.log('Loading posts with params:', data);
@@ -300,7 +368,6 @@
                         // Initialize sortable and event handlers
                         console.log('Initializing sortable and event handlers...');
                         initializeSortable(block);
-                        initializeBlock(block);
                         
                         // Trigger preview update
                         if (!globalUpdateInProgress) {
@@ -623,5 +690,27 @@
             block.remove();
             updatePreview('block_removed');
         });
+
+        // Handle manual override toggle
+        $(document).off('change', 'input[name*="[manual_override]"]')
+            .on('change', 'input[name*="[manual_override]"]', function() {
+                var $block = $(this).closest('.block-item');
+                var isManual = $(this).prop('checked');
+                var blockIndex = $block.data('index');
+                
+                // Always reload posts when toggling manual override
+                const dateRange = $block.find('.block-date-range').val();
+                const categoryId = $block.find('.block-category').val();
+                const storyCount = $block.find('.block-story-count').val();
+                
+                if (categoryId) {
+                    // Pass the manual override state to loadBlockPosts
+                    loadBlockPosts($block, categoryId, blockIndex, dateRange, storyCount, isManual)
+                        .then(() => {
+                            // Reinitialize sortable after posts are loaded
+                            initializeSortable($block);
+                        });
+                }
+            });
     });
 })(jQuery);

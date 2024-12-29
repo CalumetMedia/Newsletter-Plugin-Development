@@ -92,62 +92,87 @@ function newsletter_load_block_posts() {
     });
 
     if ($posts) {
-        $html = '<ul class="sortable-posts">';
+        $html = '<ul class="sortable-posts"' . (!isset($_POST['manual_override']) || !$_POST['manual_override'] ? ' style="pointer-events: none; opacity: 0.7;"' : '') . '>';
         
-        // First, handle previously selected posts
         $selected_posts = [];
-        foreach ($posts as $index => $post) {
-            $post_id = $post->ID;
-            if (isset($saved_selections[$post_id]) && !empty($saved_selections[$post_id]['selected'])) {
-                $selected_posts[] = $post_id;
+        $post_orders = [];
+        $posts_to_display = $posts; // Default to date-sorted posts
+        
+        // Only process saved selections if manual override is enabled
+        if (isset($_POST['manual_override']) && $_POST['manual_override'] && isset($_POST['saved_selections'])) {
+            $saved_selections = json_decode(stripslashes($_POST['saved_selections']), true);
+            
+            if (!empty($saved_selections)) {
+                foreach ($posts as $post) {
+                    $post_id = $post->ID;
+                    if (isset($saved_selections[$post_id])) {
+                        if (!empty($saved_selections[$post_id]['selected'])) {
+                            $selected_posts[] = $post_id;
+                        }
+                        if (isset($saved_selections[$post_id]['order'])) {
+                            $post_orders[$post_id] = intval($saved_selections[$post_id]['order']);
+                        }
+                    }
+                }
+
+                // Only sort by saved order if we have saved orders
+                if (!empty($post_orders)) {
+                    usort($posts_to_display, function($a, $b) use ($post_orders) {
+                        $order_a = isset($post_orders[$a->ID]) ? $post_orders[$a->ID] : PHP_INT_MAX;
+                        $order_b = isset($post_orders[$b->ID]) ? $post_orders[$b->ID] : PHP_INT_MAX;
+                        if ($order_a === $order_b) {
+                            return strtotime($b->post_date) - strtotime($a->post_date);
+                        }
+                        return $order_a - $order_b;
+                    });
+                }
             }
         }
         
-        // Then handle story count selection
-        $story_count_limit = ($story_count !== 'disable') ? intval($story_count) : PHP_INT_MAX;
-        $auto_selected_count = 0;
-        
-        foreach ($posts as $index => $post) {
+        foreach ($posts_to_display as $index => $post) {
             $post_id = $post->ID;
-            error_log("Processing post ID: $post_id, Date: {$post->post_date}, Status: {$post->post_status}");
-            
-            // Determine if this post should be checked
-            $was_selected = in_array($post_id, $selected_posts);
-            
-            $checked = '';
-            // If story count is set (not 'disable'), only check up to the limit
-            if ($story_count !== 'disable') {
-                if ($index < intval($story_count)) {
-                    $checked = 'checked';
-                    $auto_selected_count++;
-                }
-            } else {
-                // If story count is 'disable', maintain previous selections
-                if ($was_selected) {
-                    $checked = 'checked';
-                    $auto_selected_count++;
-                }
-            }
-            
-            // Check if post is scheduled
             $is_scheduled = $post->post_status === 'future';
             $scheduled_label = $is_scheduled ? '<span class="newsletter-status schedule" style="margin-left:10px;">SCHEDULED</span>' : '';
             
-            $html .= '<li data-post-id="' . esc_attr($post_id) . '">';
-            $html .= '<span class="dashicons dashicons-sort story-drag-handle"></span>';
+            $checked = '';
+            if (isset($_POST['manual_override']) && $_POST['manual_override'] && !empty($saved_selections)) {
+                // Use saved selections only if manual override is enabled
+                if (isset($saved_selections[$post_id]) && !empty($saved_selections[$post_id]['selected'])) {
+                    $checked = 'checked';
+                }
+            } elseif ($story_count !== 'disable' && $index < intval($story_count)) {
+                // When manual override is disabled or no saved selections, select based on story count and date order
+                $checked = 'checked';
+            }
+            
+            $html .= '<li data-post-id="' . esc_attr($post_id) . '" class="sortable-post-item">';
+            $html .= '<span class="dashicons dashicons-sort story-drag-handle" style="cursor: ' . ((!isset($_POST['manual_override']) || !$_POST['manual_override']) ? 'default' : 'move') . '; margin-right: 10px;"></span>';
             $html .= '<label>';
-            $html .= '<input type="checkbox" name="blocks[' . esc_attr($block_index) . '][posts][' . esc_attr($post_id) . '][selected]" value="1" ' . $checked . '> ';
+            $html .= '<input type="checkbox" 
+                            name="blocks[' . esc_attr($block_index) . '][posts][' . esc_attr($post_id) . '][selected]" 
+                            value="1" 
+                            ' . $checked . '
+                            ' . (!isset($_POST['manual_override']) || !$_POST['manual_override'] ? 'disabled' : '') . '> ';
             
             $thumbnail_url = get_the_post_thumbnail_url($post_id, 'thumbnail');
             if ($thumbnail_url) {
-                $html .= '<img src="' . esc_url($thumbnail_url) . '" alt="' . esc_attr($post->post_title) . '" style="width:50px; height:auto; margin-right:10px; vertical-align: middle;">';
+                $html .= '<img src="' . esc_url($thumbnail_url) . '" 
+                              alt="' . esc_attr($post->post_title) . '" 
+                              style="width:50px; height:auto; margin-right:10px; vertical-align: middle;">';
             }
+            
             $html .= esc_html($post->post_title) . $scheduled_label;
             $html .= '</label>';
             
-            // Set order based on saved selections or post position
-            $order = isset($saved_selections[$post_id]['order']) ? $saved_selections[$post_id]['order'] : $index;
-            $html .= '<input type="hidden" class="post-order" name="blocks[' . esc_attr($block_index) . '][posts][' . esc_attr($post_id) . '][order]" value="' . esc_attr($order) . '">';
+            // Always use the current index for order when manual override is disabled
+            $order = (isset($_POST['manual_override']) && $_POST['manual_override'] && isset($post_orders[$post_id])) 
+                    ? $post_orders[$post_id] 
+                    : $index;
+                    
+            $html .= '<input type="hidden" 
+                            class="post-order" 
+                            name="blocks[' . esc_attr($block_index) . '][posts][' . esc_attr($post_id) . '][order]" 
+                            value="' . esc_attr($order) . '">';
             
             $html .= '</li>';
         }

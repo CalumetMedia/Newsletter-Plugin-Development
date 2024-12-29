@@ -54,14 +54,16 @@ $(document).off('click', '#reset-blocks').on('click', '#reset-blocks', function(
 // Category/Date range change
 $(document).off('change.newsletter', '.block-category, .block-date-range')
     .on('change.newsletter', '.block-category, .block-date-range', function() {
-        var block = $(this).closest('.block-item');
-        var categoryId = block.find('.block-category').val();
-        var storyCount = block.find('.block-story-count').val();
-        var dateRange = block.find('.block-date-range').val() || 7;
+        var $block = $(this).closest('.block-item');
+        var categoryId = $block.find('.block-category').val();
+        var storyCount = $block.find('.block-story-count').val();
+        var dateRange = $block.find('.block-date-range').val() || 7;
+        var manualOverride = $block.find('input[name*="[manual_override]"]').prop('checked');
+        
         if (categoryId) {
-            loadBlockPosts(block, categoryId, block.data('index'), dateRange, storyCount);
+            loadBlockPosts($block, categoryId, $block.data('index'), dateRange, storyCount, manualOverride);
         } else if ($(this).hasClass('block-category')) {
-            block.find('.block-posts').html('<p>' + newsletterData.selectCategoryPrompt + '</p>');
+            $block.find('.block-posts').html('<p>' + newsletterData.selectCategoryPrompt + '</p>');
             updatePreview();
         }
     });
@@ -190,6 +192,24 @@ $(document).off('click', '#schedule-campaign').on('click', '#schedule-campaign',
             alert("Ajax error scheduling campaign: " + error);
         }
     });
+});
+
+// Reinitialize sortable after AJAX content updates
+$(document).ajaxComplete(function(event, xhr, settings) {
+    if (settings.url === newsletterData.ajaxUrl && 
+        settings.data && 
+        settings.data.indexOf('action=load_block_posts') !== -1) {
+        
+        var $block = $('.block-item').filter(function() {
+            return $(this).find('.block-posts.loading').length > 0;
+        });
+        
+        if ($block.length) {
+            setTimeout(function() {
+                initializeSortable($block);
+            }, 100);
+        }
+    }
 });
 
 })(jQuery);

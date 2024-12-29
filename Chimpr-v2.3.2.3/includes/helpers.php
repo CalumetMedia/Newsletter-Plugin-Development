@@ -20,6 +20,7 @@ if (!function_exists('get_newsletter_posts')) {
             $show_title  = isset($block['show_title']) ? (bool)$block['show_title'] : true;
             $block_title = !empty($block['title']) ? sanitize_text_field($block['title']) : '';
             $story_count = isset($block['story_count']) ? $block['story_count'] : 'disable';
+            $manual_override = isset($block['manual_override']) ? (bool)$block['manual_override'] : false;
 
             switch ($block['type']) {
                 case 'content':
@@ -55,8 +56,8 @@ if (!function_exists('get_newsletter_posts')) {
                             return $a['order'] - $b['order'];
                         });
                         
-                        // Apply story count limit if not 'all'
-                        if ($story_count !== 'all') {
+                        // Apply story count limit if not 'disable' and not in manual override mode
+                        if (!$manual_override && $story_count !== 'disable') {
                             $sorted_posts = array_slice($sorted_posts, 0, intval($story_count));
                         }
 

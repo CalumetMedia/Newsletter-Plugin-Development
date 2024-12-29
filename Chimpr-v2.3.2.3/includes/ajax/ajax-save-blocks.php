@@ -6,67 +6,57 @@ if (!defined('ABSPATH')) {
 function newsletter_handle_blocks_form_submission() {
     check_ajax_referer('save_blocks_action', 'security');
 
+    // Get the newsletter slug
     $newsletter_slug = isset($_POST['newsletter_slug']) ? sanitize_text_field($_POST['newsletter_slug']) : 'default';
+    
+    // Get existing blocks to preserve any data not in the current form submission
+    $existing_blocks = get_option("newsletter_blocks_$newsletter_slug", []);
+    
+    // Get new blocks data
     $blocks = isset($_POST['blocks']) ? wp_unslash($_POST['blocks']) : [];
     $sanitized_blocks = [];
 
-    foreach ($blocks as $block) {
+    foreach ($blocks as $index => $block) {
         // Basic block data sanitization
         $sanitized_block = [
-            'type' => sanitize_text_field($block['type']),
-            'title' => sanitize_text_field($block['title']),
-            'template_id' => sanitize_text_field($block['template_id'] ?? 'default'),
+            'type' => isset($block['type']) ? sanitize_text_field($block['type']) : (isset($existing_blocks[$index]['type']) ? $existing_blocks[$index]['type'] : ''),
+            'title' => isset($block['title']) ? sanitize_text_field($block['title']) : (isset($existing_blocks[$index]['title']) ? $existing_blocks[$index]['title'] : ''),
+            'template_id' => isset($block['template_id']) ? sanitize_text_field($block['template_id']) : (isset($existing_blocks[$index]['template_id']) ? $existing_blocks[$index]['template_id'] : 'default'),
             'show_title' => isset($block['show_title']),
-            'date_range' => isset($block['date_range']) ? intval($block['date_range']) : 7,
-            'story_count' => isset($block['story_count']) ? sanitize_text_field($block['story_count']) : 'disable'
+            'date_range' => isset($block['date_range']) ? intval($block['date_range']) : (isset($existing_blocks[$index]['date_range']) ? $existing_blocks[$index]['date_range'] : 7),
+            'story_count' => isset($block['story_count']) ? sanitize_text_field($block['story_count']) : (isset($existing_blocks[$index]['story_count']) ? $existing_blocks[$index]['story_count'] : 'disable'),
+            'manual_override' => isset($block['manual_override']) && $block['manual_override'] == '1'
         ];
 
-        // Add debug logging
-        error_log('Saving block with story count: ' . $sanitized_block['story_count']);
-
         // Handle different block types
-        if ($block['type'] === 'content') {
-            $sanitized_block['category'] = isset($block['category']) ? intval($block['category']) : 0;
-            $sanitized_block['posts'] = [];
+        if ($block['type'] === 'content' || (isset($existing_blocks[$index]['type']) && $existing_blocks[$index]['type'] === 'content')) {
+            $sanitized_block['category'] = isset($block['category']) ? intval($block['category']) : (isset($existing_blocks[$index]['category']) ? $existing_blocks[$index]['category'] : 0);
             
+            // Initialize posts array
+            $sanitized_block['posts'] = isset($existing_blocks[$index]['posts']) ? $existing_blocks[$index]['posts'] : [];
+            
+            // Process new post data
             if (!empty($block['posts']) && is_array($block['posts'])) {
-                // Sort posts by date (newest first)
-                $sorted_posts = [];
                 foreach ($block['posts'] as $post_id => $post_data) {
-                    $post_date = get_the_date('Y-m-d H:i:s', $post_id);
-                    $sorted_posts[$post_id] = [
-                        'date' => strtotime($post_date),
-                        'data' => $post_data
+                    $post_id = intval($post_id);
+                    
+                    // Determine selected state by checking the value
+                    $is_selected = isset($post_data['selected']) && $post_data['selected'] == 1;
+                    
+                    // Update or add post data
+                    $sanitized_block['posts'][$post_id] = [
+                        'selected' => $is_selected ? 1 : 0,
+                        'order' => isset($post_data['order']) ? intval($post_data['order']) : (
+                            isset($existing_blocks[$index]['posts'][$post_id]['order']) ? 
+                            $existing_blocks[$index]['posts'][$post_id]['order'] : 
+                            PHP_INT_MAX
+                        )
                     ];
                 }
-                uasort($sorted_posts, function($a, $b) {
-                    return $b['date'] - $a['date'];
-                });
-
-                // Get the story count value
-                $story_count = $sanitized_block['story_count'];
-                $count = ($story_count === 'disable') ? 0 : intval($story_count);
-                
-                // Add posts to sanitized block
-                $current_count = 0;
-                foreach ($sorted_posts as $post_id => $post_info) {
-                    $post_data = $post_info['data'];
-                    // If story count is enabled and we haven't reached the limit,
-                    // or if the post was manually selected
-                    if (($count > 0 && $current_count < $count) || 
-                        (isset($post_data['selected']) && $post_data['selected'] == '1')) {
-                        
-                        $sanitized_block['posts'][$post_id] = [
-                            'selected' => true,
-                            'order' => isset($post_data['order']) ? intval($post_data['order']) : $current_count
-                        ];
-                        $current_count++;
-                    }
-                }
             }
-        } elseif ($block['type'] === 'wysiwyg') {
+        } elseif ($block['type'] === 'wysiwyg' || (isset($existing_blocks[$index]['type']) && $existing_blocks[$index]['type'] === 'wysiwyg')) {
             // Handle WYSIWYG content
-            $content = isset($block['wysiwyg']) ? $block['wysiwyg'] : '';
+            $content = isset($block['wysiwyg']) ? $block['wysiwyg'] : (isset($existing_blocks[$index]['wysiwyg']) ? $existing_blocks[$index]['wysiwyg'] : '');
             
             // Remove any WordPress auto-added slashes
             $content = wp_unslash($content);
@@ -79,9 +69,9 @@ function newsletter_handle_blocks_form_submission() {
             // Allow HTML but prevent XSS
             $sanitized_block['wysiwyg'] = wp_kses_post($content);
             
-        } elseif ($block['type'] === 'html') {
+        } elseif ($block['type'] === 'html' || (isset($existing_blocks[$index]['type']) && $existing_blocks[$index]['type'] === 'html')) {
             // Handle HTML content
-            $html_content = isset($block['html']) ? $block['html'] : '';
+            $html_content = isset($block['html']) ? $block['html'] : (isset($existing_blocks[$index]['html']) ? $existing_blocks[$index]['html'] : '');
             $html_content = wp_unslash($html_content);
             $sanitized_block['html'] = wp_kses_post($html_content);
         }
@@ -91,7 +81,7 @@ function newsletter_handle_blocks_form_submission() {
 
     // Save blocks
     update_option("newsletter_blocks_$newsletter_slug", $sanitized_blocks);
-
+    
     // Handle additional fields
     if (isset($_POST['subject_line'])) {
         update_option(

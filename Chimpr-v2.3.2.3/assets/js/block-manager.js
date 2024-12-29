@@ -121,6 +121,12 @@
         // Initialize sortable functionality
         initializeSortable(block);
         
+        // Set initial state of story count dropdown based on manual override
+        var isManual = block.find('input[name*="[manual_override]"]').prop('checked');
+        var $storyCount = block.find('.block-story-count');
+        $storyCount.prop('disabled', isManual);
+        $storyCount.css('opacity', isManual ? '0.7' : '1');
+        
         // Initialize WYSIWYG editors in this block
         block.find('.wysiwyg-editor-content').each(function() {
             var editorId = $(this).attr('id');
@@ -169,27 +175,106 @@
         // Add checkbox change handler for posts
         block.find('.block-posts').off('change', 'input[type="checkbox"][name*="[posts]"][name*="[selected]"]')
             .on('change', 'input[type="checkbox"][name*="[posts]"][name*="[selected]"]', function() {
-                console.log('Checkbox changed!');
                 if (globalUpdateInProgress) {
-                    console.log('Update in progress, skipping...');
+                    console.log('Update in progress, skipping checkbox change');
                     return;
                 }
                 
-                console.log('Triggering preview update for checkbox change');
+                var $block = $(this).closest('.block-item');
+                var blockIndex = $block.data('index');
+                var manualOverride = $block.find('input[name*="[manual_override]"]').prop('checked');
+
+                // Only process changes if in manual override mode
+                if (!manualOverride) {
+                    console.log('Not in manual override mode, ignoring change');
+                    return;
+                }
+
+                // Create a blocks array to match the expected server-side structure
+                var blocks = [];
+                
+                // Get all block data
+                var blockData = {
+                    type: $block.find('.block-type').val(),
+                    title: $block.find('.block-title-input').val(),
+                    show_title: $block.find('.show-title-toggle').prop('checked') ? 1 : 0,
+                    template_id: $block.find('.block-template').val(),
+                    category: $block.find('.block-category').val(),
+                    date_range: $block.find('.block-date-range').val(),
+                    story_count: $block.find('.block-story-count').val(),
+                    manual_override: manualOverride ? 1 : 0,
+                    posts: {}
+                };
+
+                // Collect all post data for this block
+                $block.find('.block-posts li').each(function() {
+                    var $post = $(this);
+                    var postId = $post.data('post-id');
+                    var $postCheckbox = $post.find('input[type="checkbox"][name*="[selected]"]');
+                    var $orderInput = $post.find('.post-order');
+                    var isChecked = $postCheckbox.prop('checked');
+                    
+                    blockData.posts[postId] = {
+                        selected: isChecked ? 1 : 0,
+                        order: $orderInput.val() || '9223372036854775807'
+                    };
+                });
+
+                blocks[blockIndex] = blockData;
+
+                console.log('Saving block data:', blockData);
+
+                // Save via AJAX and update preview
                 globalUpdateInProgress = true;
-                setTimeout(() => {
-                    updatePreview('post_selection_change');
-                    globalUpdateInProgress = false;
-                }, 250);
+                
+                $.ajax({
+                    url: newsletterData.ajaxUrl,
+                    type: 'POST',
+                    data: {
+                        action: 'save_newsletter_blocks',
+                        security: newsletterData.nonceSaveBlocks,
+                        newsletter_slug: newsletterData.newsletterSlug,
+                        blocks: blocks
+                    },
+                    success: function(response) {
+                        console.log('Save response:', response);
+                        if (response.success) {
+                            // Wait a moment for the save to be processed
+                            setTimeout(() => {
+                                if (typeof window.generatePreview === 'function') {
+                                    console.log('Calling generatePreview after save...');
+                                    window.generatePreview().then(() => {
+                                        console.log('Preview generated successfully');
+                                        globalUpdateInProgress = false;
+                                    }).catch(error => {
+                                        console.error('Error generating preview:', error);
+                                        globalUpdateInProgress = false;
+                                    });
+                                } else {
+                                    console.error('generatePreview function not found');
+                                    globalUpdateInProgress = false;
+                                }
+                            }, 100); // Small delay to ensure save is processed
+                        } else {
+                            console.error('Save failed:', response);
+                            globalUpdateInProgress = false;
+                        }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Save error:', { xhr, status, error });
+                        globalUpdateInProgress = false;
+                    }
+                });
             });
 
         // Add manual override change handler
         block.find('input[name*="[manual_override]"]').off('change').on('change', function() {
+            if (globalUpdateInProgress) return;
+
             var isManual = $(this).prop('checked');
+            var $block = $(this).closest('.block-item');
             var $postsList = block.find('.sortable-posts');
-            
-            // Update sortable state
-            $postsList.sortable('option', 'disabled', !isManual);
+            var blockIndex = $block.data('index');
             
             // Update visual state
             $postsList.css({
@@ -197,21 +282,142 @@
                 'opacity': isManual ? '1' : '0.7'
             });
             
-            // Update checkboxes
-            $postsList.find('input[type="checkbox"]').prop('disabled', !isManual);
+            // Update checkboxes and story count dropdown
+            $postsList.find('input[type="checkbox"]').each(function() {
+                var $checkbox = $(this);
+                $checkbox.prop('disabled', !isManual);
+                // Uncheck all stories when enabling manual override
+                if (isManual) {
+                    $checkbox.prop('checked', false);
+                }
+            });
+
+            // Disable/Enable story count dropdown based on manual override
+            var $storyCount = $block.find('.block-story-count');
+            $storyCount.prop('disabled', isManual);
+            $storyCount.css('opacity', isManual ? '0.7' : '1');
+
+            // Create blocks array for saving
+            var blocks = [];
             
-            // Update drag handles
-            $postsList.find('.story-drag-handle').css('cursor', isManual ? 'move' : 'default');
-            
-            // If switching to automatic mode, trigger a reload of posts
-            if (!isManual) {
-                const dateRange = block.find('.block-date-range').val();
-                const categoryId = block.find('.block-category').val();
-                const blockIndex = block.data('index');
-                const storyCount = block.find('.block-story-count').val();
+            // Get all block data
+            var blockData = {
+                type: $block.find('.block-type').val(),
+                title: $block.find('.block-title-input').val(),
+                show_title: $block.find('.show-title-toggle').prop('checked') ? 1 : 0,
+                template_id: $block.find('.block-template').val(),
+                category: $block.find('.block-category').val(),
+                date_range: $block.find('.block-date-range').val(),
+                story_count: $block.find('.block-story-count').val(),
+                manual_override: isManual ? 1 : 0,
+                posts: {}
+            };
+
+            // If switching to manual mode, save the unchecked state
+            if (isManual) {
+                $block.find('.block-posts li').each(function() {
+                    var $post = $(this);
+                    var postId = $post.data('post-id');
+                    blockData.posts[postId] = {
+                        selected: 0,
+                        order: $post.find('.post-order').val() || '9223372036854775807'
+                    };
+                });
+
+                blocks[blockIndex] = blockData;
+
+                // Save the state
+                globalUpdateInProgress = true;
+
+                $.ajax({
+                    url: newsletterData.ajaxUrl,
+                    type: 'POST',
+                    data: {
+                        action: 'save_newsletter_blocks',
+                        security: newsletterData.nonceSaveBlocks,
+                        newsletter_slug: newsletterData.newsletterSlug,
+                        blocks: blocks
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            // Wait a moment for the save to be processed
+                            setTimeout(() => {
+                                if (typeof window.generatePreview === 'function') {
+                                    window.generatePreview().then(() => {
+                                        globalUpdateInProgress = false;
+                                    });
+                                } else {
+                                    globalUpdateInProgress = false;
+                                }
+                            }, 100);
+                        } else {
+                            globalUpdateInProgress = false;
+                        }
+                    },
+                    error: function() {
+                        globalUpdateInProgress = false;
+                    }
+                });
+            }
+            // If switching to automatic mode, reload posts
+            else {
+                const categoryId = $block.find('.block-category').val();
+                const dateRange = $block.find('.block-date-range').val();
+                const blockIndex = $block.data('index');
+                const storyCount = $block.find('.block-story-count').val();
                 
                 if (categoryId) {
-                    loadBlockPosts(block, categoryId, blockIndex, dateRange, storyCount);
+                    loadBlockPosts($block, categoryId, blockIndex, dateRange, storyCount)
+                        .then(() => {
+                            // After loading posts, save the state
+                            $block.find('.block-posts li').each(function() {
+                                var $post = $(this);
+                                var postId = $post.data('post-id');
+                                var $postCheckbox = $post.find('input[type="checkbox"][name*="[selected]"]');
+                                var $orderInput = $post.find('.post-order');
+                                var isChecked = $postCheckbox.prop('checked');
+                                
+                                blockData.posts[postId] = {
+                                    selected: isChecked ? 1 : 0,
+                                    order: $orderInput.val() || '9223372036854775807'
+                                };
+                            });
+
+                            blocks[blockIndex] = blockData;
+
+                            // Save the state
+                            globalUpdateInProgress = true;
+
+                            $.ajax({
+                                url: newsletterData.ajaxUrl,
+                                type: 'POST',
+                                data: {
+                                    action: 'save_newsletter_blocks',
+                                    security: newsletterData.nonceSaveBlocks,
+                                    newsletter_slug: newsletterData.newsletterSlug,
+                                    blocks: blocks
+                                },
+                                success: function(response) {
+                                    if (response.success) {
+                                        // Wait a moment for the save to be processed
+                                        setTimeout(() => {
+                                            if (typeof window.generatePreview === 'function') {
+                                                window.generatePreview().then(() => {
+                                                    globalUpdateInProgress = false;
+                                                });
+                                            } else {
+                                                globalUpdateInProgress = false;
+                                            }
+                                        }, 100);
+                                    } else {
+                                        globalUpdateInProgress = false;
+                                    }
+                                },
+                                error: function() {
+                                    globalUpdateInProgress = false;
+                                }
+                            });
+                        });
                 }
             }
         });
@@ -301,23 +507,21 @@
     };
 
     // Load block posts via AJAX
-    window.loadBlockPosts = function(block, categoryId, currentIndex, dateRange, storyCount, manualOverride) {
+    window.loadBlockPosts = function(block, categoryId, currentIndex, dateRange, storyCount) {
         // Get current selections for this block
         var savedSelections = {};
+        var manualOverride = block.find('input[name*="[manual_override]"]').prop('checked');
         
-        // Only get saved selections if manual override is enabled
-        if (manualOverride) {
-            // First get any checked checkboxes
-            block.find('input[type="checkbox"][name*="[posts]"][name*="[selected]"]:checked').each(function() {
-                var $checkbox = $(this);
-                var postId = $checkbox.closest('li').data('post-id');
-                var $orderInput = $checkbox.closest('li').find('.post-order');
-                savedSelections[postId] = {
-                    selected: true,
-                    order: $orderInput.length ? $orderInput.val() : '0'
-                };
-            });
-        }
+        // Get saved selections regardless of manual override state
+        block.find('input[type="checkbox"][name*="[posts]"][name*="[selected]"]').each(function() {
+            var $checkbox = $(this);
+            var postId = $checkbox.closest('li').data('post-id');
+            var $orderInput = $checkbox.closest('li').find('.post-order');
+            savedSelections[postId] = {
+                selected: $checkbox.prop('checked'),
+                order: $orderInput.length ? $orderInput.val() : '0'
+            };
+        });
 
         var data = {
             action: 'load_block_posts',
@@ -361,6 +565,19 @@
                         var $temp = $('<div>').html(response.data);
                         console.log('Parsed HTML elements:', $temp.children().length);
                         
+                        // If in manual override mode, ensure only previously selected posts are checked
+                        if (manualOverride) {
+                            $temp.find('input[type="checkbox"]').each(function() {
+                                var $checkbox = $(this);
+                                var postId = $checkbox.closest('li').data('post-id');
+                                if (savedSelections[postId]) {
+                                    $checkbox.prop('checked', savedSelections[postId].selected);
+                                } else {
+                                    $checkbox.prop('checked', false);
+                                }
+                            });
+                        }
+                        
                         // Append the new content
                         $postsContainer.append($temp.children());
                         console.log('New content appended');
@@ -369,15 +586,56 @@
                         console.log('Initializing sortable and event handlers...');
                         initializeSortable(block);
                         
-                        // Trigger preview update
-                        if (!globalUpdateInProgress) {
-                            console.log('Triggering preview update...');
-                            globalUpdateInProgress = true;
-                            setTimeout(() => {
-                                updatePreview('date_range_change');
-                                globalUpdateInProgress = false;
-                            }, 250);
-                        }
+                        // Save the state before updating preview
+                        var blocks = [];
+                        var blockData = {
+                            type: block.find('.block-type').val(),
+                            title: block.find('.block-title-input').val(),
+                            show_title: block.find('.show-title-toggle').prop('checked') ? 1 : 0,
+                            template_id: block.find('.block-template').val(),
+                            category: categoryId,
+                            date_range: dateRange,
+                            story_count: storyCount,
+                            manual_override: manualOverride ? 1 : 0,
+                            posts: {}
+                        };
+
+                        // Collect all post data
+                        block.find('.block-posts li').each(function() {
+                            var $post = $(this);
+                            var postId = $post.data('post-id');
+                            var $postCheckbox = $post.find('input[type="checkbox"][name*="[selected]"]');
+                            var $orderInput = $post.find('.post-order');
+                            var isChecked = $postCheckbox.prop('checked');
+                            
+                            blockData.posts[postId] = {
+                                selected: isChecked ? 1 : 0,
+                                order: $orderInput.val() || '9223372036854775807'
+                            };
+                        });
+
+                        blocks[currentIndex] = blockData;
+
+                        // Save the state before updating preview
+                        return $.ajax({
+                            url: newsletterData.ajaxUrl,
+                            type: 'POST',
+                            data: {
+                                action: 'save_newsletter_blocks',
+                                security: newsletterData.nonceSaveBlocks,
+                                newsletter_slug: newsletterData.newsletterSlug,
+                                blocks: blocks
+                            }
+                        }).then(function(saveResponse) {
+                            if (saveResponse.success) {
+                                // Now trigger the preview update
+                                if (!globalUpdateInProgress) {
+                                    console.log('Triggering preview update after save...');
+                                    updatePreview('posts_loaded');
+                                }
+                            }
+                        });
+                        
                     } catch (error) {
                         console.error('Error updating content:', error);
                         // Fallback direct HTML update
@@ -697,6 +955,20 @@
                 var $block = $(this).closest('.block-item');
                 var isManual = $(this).prop('checked');
                 var blockIndex = $block.data('index');
+                var $postsList = $block.find('.sortable-posts');
+                var $checkboxes = $postsList.find('input[type="checkbox"]');
+                
+                // Update visual state
+                $postsList.css({
+                    'pointer-events': isManual ? 'auto' : 'none',
+                    'opacity': isManual ? '1' : '0.7'
+                });
+                
+                // Enable/disable checkboxes
+                $checkboxes.prop('disabled', !isManual);
+                
+                // Update drag handles cursor
+                $postsList.find('.story-drag-handle').css('cursor', isManual ? 'move' : 'default');
                 
                 // Always reload posts when toggling manual override
                 const dateRange = $block.find('.block-date-range').val();
@@ -704,11 +976,16 @@
                 const storyCount = $block.find('.block-story-count').val();
                 
                 if (categoryId) {
-                    // Pass the manual override state to loadBlockPosts
-                    loadBlockPosts($block, categoryId, blockIndex, dateRange, storyCount, isManual)
+                    loadBlockPosts($block, categoryId, blockIndex, dateRange, storyCount)
                         .then(() => {
-                            // Reinitialize sortable after posts are loaded
-                            initializeSortable($block);
+                            // Update preview after posts are loaded
+                            if (!globalUpdateInProgress) {
+                                globalUpdateInProgress = true;
+                                setTimeout(() => {
+                                    updatePreview('manual_override_change');
+                                    globalUpdateInProgress = false;
+                                }, 250);
+                            }
                         });
                 }
             });

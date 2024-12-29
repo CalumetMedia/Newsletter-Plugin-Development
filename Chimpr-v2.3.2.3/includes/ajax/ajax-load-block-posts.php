@@ -93,17 +93,40 @@ function newsletter_load_block_posts() {
 
     if ($posts) {
         $html = '<ul class="sortable-posts">';
+        
+        // First, handle previously selected posts
+        $selected_posts = [];
+        foreach ($posts as $index => $post) {
+            $post_id = $post->ID;
+            if (isset($saved_selections[$post_id]) && !empty($saved_selections[$post_id]['selected'])) {
+                $selected_posts[] = $post_id;
+            }
+        }
+        
+        // Then handle story count selection
+        $story_count_limit = ($story_count !== 'disable') ? intval($story_count) : PHP_INT_MAX;
+        $auto_selected_count = 0;
+        
         foreach ($posts as $index => $post) {
             $post_id = $post->ID;
             error_log("Processing post ID: $post_id, Date: {$post->post_date}, Status: {$post->post_status}");
             
-            // Check if post was previously selected
-            $was_selected = isset($saved_selections[$post_id]) && !empty($saved_selections[$post_id]['selected']);
+            // Determine if this post should be checked
+            $was_selected = in_array($post_id, $selected_posts);
             
-            // Auto-check based on story count and order, or if previously selected
             $checked = '';
-            if ($story_count === 'disable' || $was_selected || $index < intval($story_count)) {
-                $checked = 'checked';
+            // If story count is set (not 'disable'), only check up to the limit
+            if ($story_count !== 'disable') {
+                if ($index < intval($story_count)) {
+                    $checked = 'checked';
+                    $auto_selected_count++;
+                }
+            } else {
+                // If story count is 'disable', maintain previous selections
+                if ($was_selected) {
+                    $checked = 'checked';
+                    $auto_selected_count++;
+                }
             }
             
             // Check if post is scheduled
@@ -131,13 +154,13 @@ function newsletter_load_block_posts() {
         $html .= '</ul>';
         
         if ($story_count !== 'disable') {
-            $message = ($story_count === 'all') 
-                ? esc_html__('Showing all posts in date range.', 'newsletter')
-                : sprintf(
-                    esc_html__('Showing %d most recent posts. Manual changes will switch to manual selection mode.', 'newsletter'),
-                    intval($story_count)
-                );
+            $message = sprintf(
+                esc_html__('Showing %d most recent posts. Manual changes will switch to manual selection mode.', 'newsletter'),
+                intval($story_count)
+            );
             $html .= '<p class="description">' . $message . '</p>';
+        } else {
+            $html .= '<p class="description">' . esc_html__('Showing all posts in date range.', 'newsletter') . '</p>';
         }
         
         error_log("Generated HTML length: " . strlen($html));

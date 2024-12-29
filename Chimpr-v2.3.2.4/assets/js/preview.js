@@ -3,196 +3,264 @@
     let previewUpdatePromise = null;
     let globalUpdateInProgress = false;
 
+    // Track active AJAX requests
+    let activeRequests = [];
+
+    // Helper function to cleanup requests
+    function cleanupRequests() {
+        activeRequests.forEach(request => {
+            if (request && request.abort) {
+                request.abort();
+            }
+        });
+        activeRequests = [];
+    }
+
     // Save and update preview
     window.saveAndUpdatePreview = function(blockData, blockIndex) {
         console.log('[Preview] Saving block data:', blockData);
         
+        // If there's already an update in progress, queue this save
+        if (globalUpdateInProgress) {
+            console.log('[Preview] Update in progress, queueing save');
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    saveAndUpdatePreview(blockData, blockIndex).then(resolve);
+                }, 100);
+            });
+        }
+
+        globalUpdateInProgress = true;
+        
         var blocks = [];
         blocks[blockIndex] = blockData;
 
-        globalUpdateInProgress = true;
-        
-        return $.ajax({
-            url: newsletterData.ajaxUrl,
-            type: 'POST',
-            data: {
-                action: 'save_newsletter_blocks',
-                security: newsletterData.nonceSaveBlocks,
-                newsletter_slug: newsletterData.newsletterSlug,
-                blocks: blocks
-            },
-            success: function(response) {
-                console.log('[Preview] Save response:', response);
-                if (response.success) {
-                    // Wait a moment for the save to be processed
-                    setTimeout(() => {
-                        if (typeof window.generatePreview === 'function') {
-                            console.log('[Preview] Calling generatePreview after save...');
-                            window.generatePreview().then(() => {
-                                console.log('[Preview] Preview generated successfully');
-                                globalUpdateInProgress = false;
-                            }).catch(error => {
-                                console.error('[Preview] Error generating preview:', error);
-                                globalUpdateInProgress = false;
-                            });
-                        } else {
-                            console.error('[Preview] generatePreview function not found');
-                            globalUpdateInProgress = false;
-                        }
-                    }, 100); // Small delay to ensure save is processed
-                } else {
-                    console.error('[Preview] Save failed:', response);
-                    globalUpdateInProgress = false;
+        return new Promise((resolve, reject) => {
+            const request = $.ajax({
+                url: newsletterData.ajaxUrl,
+                type: 'POST',
+                data: {
+                    action: 'save_newsletter_blocks',
+                    security: newsletterData.nonceSaveBlocks,
+                    newsletter_slug: newsletterData.newsletterSlug,
+                    blocks: blocks
                 }
-            },
-            error: function(xhr, status, error) {
-                console.error('[Preview] Save error:', { xhr, status, error });
-                globalUpdateInProgress = false;
-            }
+            });
+
+            // Track this request
+            activeRequests.push(request);
+
+            request
+                .done(response => {
+                    console.log('[Preview] Save response:', response);
+                    if (!response.success) {
+                        console.error('[Preview] Save failed:', response);
+                        resetPreviewState();
+                        reject(response);
+                        return;
+                    }
+                    
+                    // Only trigger preview after a successful save
+                    console.log('[Preview] Save successful, generating preview...');
+                    generatePreview('after_save')
+                        .then(() => resolve(response))
+                        .catch(error => reject(error))
+                        .finally(() => {
+                            const index = activeRequests.indexOf(request);
+                            if (index > -1) {
+                                activeRequests.splice(index, 1);
+                            }
+                            resetPreviewState();
+                        });
+                })
+                .fail((xhr, status, error) => {
+                    console.error('[Preview] Save error:', { xhr, status, error });
+                    resetPreviewState();
+                    reject(error);
+                });
         });
     };
 
-    window.generatePreview = function() {
-        // If there's already a preview update in progress, wait for it
-        if (previewUpdatePromise) {
-            return previewUpdatePromise;
+    function collectPostStates() {
+        const state = {};
+        $('.block-item').each(function() {
+            const blockIndex = $(this).data('index');
+            state[blockIndex] = state[blockIndex] || {};
+            
+            $(this).find('.sortable-post-item').each(function() {
+                const postId = $(this).data('post-id');
+                const $checkbox = $(this).find('input[type="checkbox"][name*="[checked]"]');
+                const $orderInput = $(this).find('.post-order');
+                
+                // Only store checked posts
+                if ($checkbox.prop('checked')) {
+                    state[blockIndex][postId] = {
+                        checked: '1',
+                        order: $orderInput.val() || '0'
+                    };
+                }
+            });
+        });
+        return state;
+    }
+
+    function generatePreview(trigger) {
+        if (globalUpdateInProgress) {
+            console.log('[Preview] Update still in progress, skipping');
+            return Promise.resolve();
         }
 
         console.log('[Preview] Starting preview generation');
+        globalUpdateInProgress = true;
 
-        // Store the current state of all checkboxes and their order
-        var savedState = {};
-        $('.block-item').each(function() {
-            var $block = $(this);
-            var blockIndex = $block.data('index');
-            var categoryId = $block.find('.block-category').val();
-            var storyCount = $block.find('.block-story-count').val();
-            var manualOverride = $block.find('input[name*="[manual_override]"]').prop('checked');
+        try {
+            // Collect current state
+            const postStates = collectPostStates();
             
-            savedState[blockIndex] = {
-                storyCount: storyCount,
-                category: categoryId,
-                manual_override: manualOverride ? 1 : 0,
-                selections: {}
-            };
-            
-            $block.find('input[type="checkbox"][name*="[posts]"][name*="[selected]"]').each(function() {
-                var $checkbox = $(this);
-                var postId = $checkbox.closest('li').data('post-id');
-                var $orderInput = $checkbox.closest('li').find('.post-order');
-                var isChecked = $checkbox.is(':checked');
-                var order = $orderInput.length ? $orderInput.val() : '0';
-                
-                console.log('[Preview] Post state:', { blockIndex, postId, isChecked, order });
-                
-                savedState[blockIndex].selections[postId] = {
-                    checked: isChecked,
-                    order: order
-                };
-            });
-        });
-
-        console.log('[Preview] Collected state:', savedState);
-
-        var formData = $('#blocks-form').serializeArray();
-        formData.push({ name: 'action', value: 'generate_preview' });
-        formData.push({ name: 'newsletter_slug', value: newsletterData.newsletterSlug });
-        formData.push({ name: 'security', value: newsletterData.nonceGeneratePreview });
-        formData.push({ name: 'saved_selections', value: JSON.stringify(savedState) });
-
-        // Create and store the promise
-        previewUpdatePromise = $.ajax({
-            url: newsletterData.ajaxUrl,
-            method: 'POST',
-            dataType: 'json',
-            data: formData
-        }).done(function(response) {
-            console.log('[Preview] Server response:', response);
-            if (response.success) {
-                $('#preview-content').html(response.data);
-                
-                // Restore state after preview loads
-                $('.block-item').each(function() {
-                    var $block = $(this);
-                    var blockIndex = $block.data('index');
-                    var state = savedState[blockIndex];
-                    
-                    if (state) {
-                        $block.find('.block-story-count').val(state.storyCount);
-                        Object.keys(state.selections).forEach(function(postId) {
-                            var selection = state.selections[postId];
-                            var $li = $block.find('li[data-post-id="' + postId + '"]');
-                            if ($li.length) {
-                                var $checkbox = $li.find('input[type="checkbox"][name*="[selected]"]');
-                                var $orderInput = $li.find('.post-order');
-                                
-                                if ($checkbox.length) {
-                                    console.log('[Preview] Restoring checkbox state:', { postId, checked: selection.checked });
-                                    $checkbox.prop('checked', selection.checked);
-                                }
-                                if ($orderInput.length) {
-                                    $orderInput.val(selection.order);
-                                }
-                            }
-                        });
-                    }
+            // Log the state for debugging
+            Object.entries(postStates).forEach(([blockIndex, posts]) => {
+                Object.entries(posts).forEach(([postId, state]) => {
+                    console.log('[Preview] Post state:', {
+                        blockIndex,
+                        postId,
+                        isChecked: state.checked === '1',
+                        order: state.order
+                    });
                 });
-            } else {
-                console.error('[Preview] Error in preview response:', response);
-            }
-        }).fail(function(jqXHR, textStatus, errorThrown) {
-            console.error('[Preview] Error updating preview:', textStatus, errorThrown);
-        }).always(function() {
-            previewUpdatePromise = null;
-        });
+            });
 
-        return previewUpdatePromise;
-    };
+            console.log('[Preview] Collected state:', postStates);
 
-    // Debounced updatePreview function
+            // Get all blocks data
+            const blocks = [];
+            $('.block-item').each(function() {
+                const blockIndex = $(this).data('index');
+                const blockData = {
+                    type: $(this).find('.block-type').val(),
+                    title: $(this).find('.block-title').val(),
+                    show_title: $(this).find('.show-title-toggle').prop('checked') ? 1 : 0,
+                    template_id: $(this).find('.block-template').val(),
+                    category: $(this).find('.block-category').val(),
+                    date_range: $(this).find('.block-date-range').val(),
+                    story_count: $(this).find('.block-story-count').val(),
+                    manual_override: $(this).find('.manual-override-toggle').prop('checked') ? 1 : 0,
+                    posts: {}
+                };
+
+                // Add post states
+                if (postStates[blockIndex]) {
+                    blockData.posts = postStates[blockIndex];
+                }
+
+                if (blockData.type === 'html') {
+                    blockData.html = $(this).find('.html-block textarea').val();
+                } else if (blockData.type === 'wysiwyg') {
+                    blockData.wysiwyg = $(this).find('.wysiwyg-editor-content').val();
+                }
+
+                blocks[blockIndex] = blockData;
+            });
+
+            var formData = $('#blocks-form').serializeArray();
+            formData.push({ name: 'action', value: 'generate_preview' });
+            formData.push({ name: 'newsletter_slug', value: newsletterData.newsletterSlug });
+            formData.push({ name: 'security', value: newsletterData.nonceGeneratePreview });
+            formData.push({ name: 'saved_selections', value: JSON.stringify(postStates) });
+
+            // Create and store the promise
+            previewUpdatePromise = new Promise((resolve, reject) => {
+                $.ajax({
+                    url: newsletterData.ajaxUrl,
+                    method: 'POST',
+                    dataType: 'json',
+                    data: formData
+                })
+                .done(response => {
+                    console.log('[Preview] Server response:', response);
+                    if (!response.success) {
+                        reject(new Error(response.data || 'Preview generation failed'));
+                        return;
+                    }
+                    $('#preview-content').html(response.data);
+                    console.log('[Preview] Preview updated successfully');
+                    resolve(response);
+                })
+                .fail(error => {
+                    console.error('[Preview] Error updating preview:', error);
+                    reject(error);
+                })
+                .always(() => {
+                    // Remove this request from tracking
+                    const index = activeRequests.indexOf(previewUpdatePromise);
+                    if (index > -1) {
+                        activeRequests.splice(index, 1);
+                    }
+                    resetPreviewState();
+                });
+            });
+
+            // Track this request
+            activeRequests.push(previewUpdatePromise);
+
+            return previewUpdatePromise;
+
+        } catch (error) {
+            console.error('[Preview] Error in preview generation:', error);
+            resetPreviewState();
+            return Promise.reject(error);
+        }
+    }
+
+    // Simplified updatePreview function with debounce
+    let previewTimeout = null;
+    let lastUpdateSource = null;
     window.updatePreview = function(source) {
-        console.log('[Preview] Update requested from:', source);
-        
-        // If there's already an update in progress, queue this one
-        if (globalUpdateInProgress) {
-            console.log('[Preview] Update in progress, queueing update');
-            if (window.updatePreviewTimeout) {
-                clearTimeout(window.updatePreviewTimeout);
-            }
-            
-            window.updatePreviewTimeout = setTimeout(function() {
-                console.log('[Preview] Processing queued update');
-                generatePreview();
-            }, 500);
+        // Skip undefined source if we've already had a real update
+        if (!source && lastUpdateSource) {
+            console.log('[Preview] Skipping undefined source update after', lastUpdateSource);
             return;
         }
         
+        console.log('[Preview] Update requested from:', source);
+        lastUpdateSource = source || 'initial';
+        
         // Clear any existing timeout
-        if (window.updatePreviewTimeout) {
-            clearTimeout(window.updatePreviewTimeout);
-            window.updatePreviewTimeout = null;
+        if (previewTimeout) {
+            clearTimeout(previewTimeout);
+            previewTimeout = null;
         }
         
-        // Set the flag before starting the update
-        globalUpdateInProgress = true;
+        // If an update is in progress, wait a bit longer
+        const delay = globalUpdateInProgress ? 500 : 250;
         
-        // Generate the preview
-        generatePreview().then(function() {
-            globalUpdateInProgress = false;
-            
-            // If there's a queued update, process it
-            if (window.updatePreviewTimeout) {
-                console.log('[Preview] Processing queued update after completion');
-                clearTimeout(window.updatePreviewTimeout);
-                window.updatePreviewTimeout = setTimeout(function() {
-                    updatePreview('queued_update');
-                }, 100);
+        // Set a new timeout
+        previewTimeout = setTimeout(function() {
+            previewTimeout = null;  // Clear the reference
+            // Double check the flag when timeout executes
+            if (!globalUpdateInProgress) {
+                generatePreview();
+            } else {
+                console.log('[Preview] Update still in progress, skipping');
             }
-        }).catch(function(error) {
-            console.error('[Preview] Error in preview update:', error);
-            globalUpdateInProgress = false;
-        });
+        }, delay);
     };
+
+    // Cleanup on page unload
+    $(window).on('unload', function() {
+        resetPreviewState();
+    });
+
+    // Helper function to reset state
+    function resetPreviewState() {
+        if (previewTimeout) {
+            clearTimeout(previewTimeout);
+            previewTimeout = null;
+        }
+        cleanupRequests();
+        globalUpdateInProgress = false;
+        previewUpdatePromise = null;
+        lastUpdateSource = null;
+    }
 
     // Helper function to collect block data
     window.collectBlockData = function($block) {
@@ -215,11 +283,11 @@
         $block.find('.block-posts li').each(function() {
             var $post = $(this);
             var postId = $post.data('post-id');
-            var $checkbox = $post.find('input[type="checkbox"][name*="[selected]"]');
+            var $checkbox = $post.find('input[type="checkbox"][name*="[checked]"]');
             var $orderInput = $post.find('.post-order');
             
             posts[postId] = {
-                selected: $checkbox.prop('checked') ? 1 : 0,
+                checked: $checkbox.prop('checked') ? '1' : '',
                 order: $orderInput.val() || '9223372036854775807'
             };
         });
@@ -229,6 +297,11 @@
     // Export global update flag
     window.isPreviewUpdateInProgress = function() {
         return globalUpdateInProgress;
+    };
+
+    // Expose a function to set the global update flag
+    window.setPreviewUpdateInProgress = function(value) {
+        globalUpdateInProgress = value;
     };
 
 })(jQuery);

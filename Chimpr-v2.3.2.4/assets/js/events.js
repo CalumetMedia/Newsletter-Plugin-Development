@@ -118,75 +118,9 @@ $(document).on('change', '.show-title-toggle, #start_date, #end_date, .block-tem
 
 // Block Type Change
 $(document).off('change', '.block-type').on('change', '.block-type', function() {
-    var $block = $(this).closest('.block-item');
+    var block = $(this).closest('.block-item');
     var blockType = $(this).val();
-    handleBlockTypeChange($block, blockType);
-    
-    // Clear previous content when switching types
-    if (blockType === 'html') {
-        $block.find('.html-block textarea').val('');
-    } else if (blockType === 'wysiwyg') {
-        var $editorContainer = $block.find('.wysiwyg-block');
-        var blockIndex = $block.data('index');
-        var editorId = 'wysiwyg-editor-' + blockIndex;
-        
-        // Create the editor textarea if it doesn't exist
-        if (!$editorContainer.find('#' + editorId).length) {
-            $editorContainer.html(
-                '<textarea name="blocks[' + blockIndex + '][wysiwyg]" ' +
-                'class="wysiwyg-editor-content" ' +
-                'id="' + editorId + '"></textarea>'
-            );
-        }
-        
-        // Remove existing editor instance if it exists
-        if (typeof wp !== 'undefined' && wp.editor) {
-            wp.editor.remove(editorId);
-        }
-
-        // Show the container and initialize the editor
-        $editorContainer.show();
-        
-        // Initialize new editor with a slight delay to ensure DOM is ready
-        setTimeout(function() {
-            if (typeof wp !== 'undefined' && wp.editor) {
-                wp.editor.initialize(editorId, {
-                    tinymce: {
-                        wpautop: true,
-                        plugins: 'paste,lists,link,textcolor,wordpress,wplink,hr,charmap,wptextpattern',
-                        toolbar1: 'formatselect,bold,italic,bullist,numlist,link,unlink,forecolor,hr',
-                        setup: function(editor) {
-                            editor.on('change keyup paste input', function() {
-                                editor.save();
-                                if (!globalUpdateInProgress) {
-                                    globalUpdateInProgress = true;
-                                    setTimeout(() => {
-                                        updatePreview('wysiwyg_content_change');
-                                        globalUpdateInProgress = false;
-                                    }, 250);
-                                }
-                            });
-                        }
-                    },
-                    quicktags: true,
-                    mediaButtons: true
-                });
-            }
-        }, 100);
-    }
-    
-    // Save the block type change
-    var blockData = collectBlockData($block);
-    saveAndUpdatePreview(blockData, $block.data('index'));
-});
-
-// Add content change handlers for each type
-$(document).on('input change', '.html-block textarea, .wysiwyg-editor-content', function() {
-    if (globalUpdateInProgress) return;
-    
-    var $block = $(this).closest('.block-item');
-    var blockData = collectBlockData($block);
-    saveAndUpdatePreview(blockData, $block.data('index'));
+    handleBlockTypeChange(block, blockType);
 });
 
 // Send to Mailchimp (create campaign)

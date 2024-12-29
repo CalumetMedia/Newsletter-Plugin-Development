@@ -64,55 +64,6 @@ function get_newsletter_blocks_by_slug($slug) {
         update_option($blocks_option, $blocks);
     }
 
-    // Process each content block to maintain selected posts
-    foreach ($blocks as &$block) {
-        if ($block['type'] === 'content') {
-            $story_count = isset($block['story_count']) ? $block['story_count'] : 'disable';
-            $count = ($story_count === 'disable') ? 0 : intval($story_count);
-            
-            // If there are saved post selections, maintain them
-            if (!empty($block['posts'])) {
-                $selected_posts = $block['posts'];
-                
-                // Get all available posts for the block's category and date range
-                $args = array(
-                    'posts_per_page' => -1,
-                    'category' => $block['category'],
-                    'date_query' => array(
-                        'after' => date('Y-m-d', strtotime("-{$block['date_range']} days"))
-                    ),
-                    'orderby' => 'date',
-                    'order' => 'DESC'
-                );
-                
-                $query = new WP_Query($args);
-                $current_count = 0;
-                
-                foreach ($query->posts as $post) {
-                    $post_id = $post->ID;
-                    // Only include posts that are explicitly checked in manual mode
-                    if (isset($selected_posts[$post_id]) && isset($selected_posts[$post_id]['checked']) && $selected_posts[$post_id]['checked'] === '1') {
-                        $block['posts'][$post_id] = [
-                            'selected' => true,
-                            'order' => isset($selected_posts[$post_id]['order']) 
-                                ? $selected_posts[$post_id]['order'] 
-                                : $current_count
-                        ];
-                        $current_count++;
-                    } elseif (!$block['manual_override'] && $count > 0 && $current_count < $count) {
-                        // In automatic mode, include posts based on story count
-                        $block['posts'][$post_id] = [
-                            'selected' => true,
-                            'order' => $current_count
-                        ];
-                        $current_count++;
-                    }
-                }
-            }
-        }
-    }
-    unset($block);
-
     return $blocks;
 }
 
@@ -123,3 +74,4 @@ $preview_html = newsletter_generate_preview_content($newsletter_slug, $blocks);
 
 // Output the generated preview
 echo !empty($preview_html) ? $preview_html : '<p class="error">' . esc_html__('Unable to generate preview content.', 'newsletter') . '</p>';
+?>

@@ -143,41 +143,46 @@ if (!isset($block_templates['default'])) {
         </div>
 
         <!-- WYSIWYG Block -->
-        <div class="wysiwyg-block" <?php if ($block['type'] !== 'wysiwyg') echo 'style="display:none;"'; ?>>
-            <label><?php esc_html_e('WYSIWYG Content:', 'newsletter'); ?></label>
-            <?php
-            $editor_id = 'wysiwyg-editor-' . $index;
-            $wysiwyg_content = isset($block['wysiwyg']) ? wp_kses_post($block['wysiwyg']) : '';
-            
-            if ($block['type'] === 'wysiwyg') {
-                wp_editor(
-                    $wysiwyg_content,
-                    $editor_id,
-                    array(
-                        'textarea_name' => 'blocks[' . esc_attr($index) . '][wysiwyg]',
-                        'media_buttons' => true,
-                        'textarea_rows' => 15,
-                        'editor_class' => 'wysiwyg-editor-content',
-                        'tinymce' => array(
-                            'setup' => "function(editor) {
-                                editor.on('change', function() {
-                                    editor.save();
-                                });
-                            }"
-                        ),
-                        'quicktags' => true
-                    )
-                );
-            } else {
-                // Just create the textarea placeholder that will be initialized when switching to WYSIWYG
-                echo '<textarea name="blocks[' . esc_attr($index) . '][wysiwyg]" ' .
-                     'class="wysiwyg-editor-content" ' .
-                     'id="' . esc_attr($editor_id) . '">' . 
-                     esc_textarea($wysiwyg_content) . 
-                     '</textarea>';
-            }
-            ?>
-        </div>
+        <?php if ($block['type'] === 'wysiwyg'): ?>
+<!-- WYSIWYG Block -->
+<div class="wysiwyg-block" <?php if ($block['type'] !== 'wysiwyg') echo 'style="display:none;"'; ?>>
+    <label><?php esc_html_e('WYSIWYG Content:', 'newsletter'); ?></label>
+    <?php
+    $editor_id = 'wysiwyg-editor-' . $index;
+    $wysiwyg_content = isset($block['wysiwyg']) ? wp_kses_post($block['wysiwyg']) : '';
+    
+    // Add error logging
+    error_log("Initializing WYSIWYG editor $editor_id with content: " . $wysiwyg_content);
+    
+    wp_editor(
+        $wysiwyg_content,
+        $editor_id,
+        array(
+            'textarea_name' => 'blocks[' . esc_attr($index) . '][wysiwyg]',
+            'media_buttons' => true,
+            'textarea_rows' => 15,
+            'editor_class' => 'wysiwyg-editor-content',
+            'tinymce' => array(
+                'init_instance_callback' => "function(editor) {
+                    editor.on('change', function(e) {
+                        editor.save();
+                        jQuery(editor.getElement()).trigger('change');
+                    });
+                }",
+                'setup' => "function(editor) {
+                    editor.on('change', function() {
+                        editor.save();
+                    });
+                }"
+            ),
+            'quicktags' => true
+        )
+    );
+    ?>
+</div>
+        <?php else: ?>
+            <div class="wysiwyg-block" style="display:none;"></div>
+        <?php endif; ?>
 
         <!-- Content Block Section -->
         <div class="content-block" <?php if ($block['type'] !== 'content') echo 'style="display:none;"'; ?>>
@@ -207,7 +212,7 @@ if (!isset($block_templates['default'])) {
                         echo '<ul class="sortable-posts" ' . (!isset($block['manual_override']) || !$block['manual_override'] ? 'style="pointer-events: none; opacity: 0.7;"' : '') . '>';
                         foreach ($posts as $post) {
                             $post_id = $post->ID;
-                            $checked = isset($selected_posts[$post_id]['selected']) ? 'checked' : '';
+                            $checked = isset($selected_posts[$post_id]['checked']) ? 'checked' : '';
                             $thumbnail_url = get_the_post_thumbnail_url($post_id, 'thumbnail') ?: '';
                             $order = isset($selected_posts[$post_id]['order']) ? intval($selected_posts[$post_id]['order']) : PHP_INT_MAX;
                             ?>
@@ -215,10 +220,9 @@ if (!isset($block_templates['default'])) {
                                 <span class="dashicons dashicons-sort story-drag-handle" style="cursor: move; margin-right: 10px;"></span>
                                 <label>
                                     <input type="checkbox" 
-                                           name="blocks[<?php echo esc_attr($index); ?>][posts][<?php echo esc_attr($post_id); ?>][selected]" 
+                                           name="blocks[<?php echo esc_attr($index); ?>][posts][<?php echo esc_attr($post_id); ?>][checked]" 
                                            value="1" 
-                                           <?php echo $checked; ?>
-                                           <?php echo (!isset($block['manual_override']) || !$block['manual_override'] ? 'disabled' : ''); ?>> 
+                                           <?php echo $checked; ?>>
                                     <?php if ($thumbnail_url): ?>
                                         <img src="<?php echo esc_url($thumbnail_url); ?>" alt="<?php echo esc_attr($post->post_title); ?>" style="width:50px; height:auto; margin-right:10px; vertical-align: middle;">
                                     <?php endif; ?>
@@ -238,51 +242,6 @@ if (!isset($block_templates['default'])) {
                 ?>
             </div>
         </div>
-
-        <!-- Add JavaScript for manual override functionality -->
-        <script>
-        jQuery(document).ready(function($) {
-            var blockIndex = <?php echo esc_js($index); ?>;
-            var $manualOverride = $('input[name="blocks[' + blockIndex + '][manual_override]"]');
-            var $postsList = $manualOverride.closest('.block-item').find('.sortable-posts');
-            var $checkboxes = $postsList.find('input[type="checkbox"]');
-            
-            // Function to update the interactive state
-            function updateInteractiveState(isManual) {
-                // Update visual state
-                $postsList.css({
-                    'pointer-events': isManual ? 'auto' : 'none',
-                    'opacity': isManual ? '1' : '0.7'
-                });
-                
-                // Enable/disable checkboxes
-                $checkboxes.prop('disabled', !isManual);
-                
-                // Update drag handles cursor
-                $postsList.find('.story-drag-handle').css('cursor', isManual ? 'move' : 'default');
-            }
-
-            // Initialize the state based on current manual override value
-            updateInteractiveState($manualOverride.prop('checked'));
-
-            // Handle manual override toggle
-            $manualOverride.on('change', function() {
-                var isManual = $(this).prop('checked');
-                updateInteractiveState(isManual);
-                
-                // If switching to automatic mode, trigger a reload of posts
-                if (!isManual) {
-                    const dateRange = $(this).closest('.block-item').find('.block-date-range').val();
-                    const categoryId = $(this).closest('.block-item').find('.block-category').val();
-                    const storyCount = $(this).closest('.block-item').find('.block-story-count').val();
-                    
-                    if (categoryId) {
-                        window.loadBlockPosts($(this).closest('.block-item'), categoryId, blockIndex, dateRange, storyCount);
-                    }
-                }
-            });
-        });
-        </script>
 
         <!-- HTML Block Section -->
         <div class="html-block" <?php if ($block['type'] !== 'html') echo 'style="display:none;"'; ?>>

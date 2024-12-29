@@ -42,8 +42,20 @@ if (!function_exists('get_newsletter_posts')) {
                         
                         // Get all selected posts
                         foreach ($block['posts'] as $post_id => $post_data) {
-                            if (!empty($post_data['selected'])) {
+                            // Validate post data structure
+                            if (!is_array($post_data)) {
+                                error_log("Invalid post data structure for post ID: $post_id");
+                                continue;
+                            }
+
+                            // Normalize checked value and only store checked posts
+                            if (isset($post_data['checked']) && $post_data['checked'] === '1') {
+                                // Ensure order is a valid integer
                                 $order = isset($post_data['order']) ? intval($post_data['order']) : PHP_INT_MAX;
+                                if ($order < 0) {
+                                    $order = PHP_INT_MAX;
+                                }
+                                
                                 $sorted_posts[] = [
                                     'id' => $post_id,
                                     'order' => $order
@@ -58,7 +70,12 @@ if (!function_exists('get_newsletter_posts')) {
                         
                         // Apply story count limit if not 'disable' and not in manual override mode
                         if (!$manual_override && $story_count !== 'disable') {
-                            $sorted_posts = array_slice($sorted_posts, 0, intval($story_count));
+                            $count = intval($story_count);
+                            if ($count > 0) {
+                                $sorted_posts = array_slice($sorted_posts, 0, $count);
+                            } else {
+                                error_log("Invalid story count value: $story_count");
+                            }
                         }
 
                         // Process sorted posts
@@ -76,11 +93,15 @@ if (!function_exists('get_newsletter_posts')) {
                                     'author_name'   => get_the_author_meta('display_name', $post->post_author),
                                     'ID'            => $post_id
                                 ];
+                                error_log("Successfully processed post ID: $post_id with order: " . $sorted_post['order']);
+                            } else {
+                                error_log("Failed to get post with ID: $post_id");
                             }
                         }
 
                         if (!empty($current_block['posts'])) {
                             $newsletter_data[] = $current_block;
+                            error_log("Added block with " . count($current_block['posts']) . " posts to newsletter data");
                         }
                     }
                     break;
@@ -153,52 +174,69 @@ if ($block_data['type'] === 'content') {
     $template_id = isset($block_data['template_id']) ? $block_data['template_id'] : 'default';
     $template_content = '';
 
+    // Validate and get template content
     if (($template_id === '0' || $template_id === 0) && isset($available_templates[0])) {
         $template_content = $available_templates[0]['html'];
     } elseif (!empty($template_id) && isset($available_templates[$template_id]) && isset($available_templates[$template_id]['html'])) {
         $template_content = $available_templates[$template_id]['html'];
     } else {
-        ob_start();
-        include NEWSLETTER_PLUGIN_DIR . 'templates/default-template.php';
-        $template_content = ob_get_clean();
+        error_log("Template not found for ID: $template_id, using default template");
+        if (file_exists(NEWSLETTER_PLUGIN_DIR . 'templates/default-template.php')) {
+            ob_start();
+            include NEWSLETTER_PLUGIN_DIR . 'templates/default-template.php';
+            $template_content = ob_get_clean();
+        } else {
+            error_log("Default template file not found");
+            $template_content = '<div class="post-content">{title}<br>{content}</div>';
+        }
     }
 
     if (!empty($block_data['posts'])) {
         foreach ($block_data['posts'] as $post_data) {
-                        $block_content = $template_content;
-
-                        // Handle conditional thumbnail tags
-                        if (!empty($post_data['thumbnail_url'])) {
-                            $block_content = preg_replace('/\{if_thumbnail\}(.*?)\{\/if_thumbnail\}/s', '$1', $block_content);
-                        } else {
-                            $block_content = preg_replace('/\{if_thumbnail\}.*?\{\/if_thumbnail\}/s', '', $block_content);
-                        }
-
-                        $replacements = [
-                            '{title}'         => esc_html($post_data['title']),
-                            '{content}'       => wp_kses_post($post_data['content']),
-                            '{thumbnail_url}' => esc_url($post_data['thumbnail_url']),
-                            '{permalink}'     => esc_url($post_data['permalink']),
-                            '{excerpt}'       => wp_kses_post(!empty($post_data['excerpt']) ? $post_data['excerpt'] : wp_trim_words($post_data['content'], 55)),
-                            '{author}'        => esc_html($post_data['author_name']),
-                            '{publish_date}'  => esc_html(get_the_date('', $post_data['ID'])),
-                            '{categories}'    => esc_html(implode(', ', wp_get_post_categories($post_data['ID'], ['fields' => 'names'])))
-                        ];
-
-                        $newsletter_html .= strtr($block_content, $replacements);
-                    }
-                }
-            } elseif ($block_data['type'] === 'html') {
-                $newsletter_html .= wp_kses_post(wp_unslash($block_data['html']));
-            } elseif ($block_data['type'] === 'wysiwyg') {
-                $content = isset($block_data['wysiwyg']) ? $block_data['wysiwyg'] : '';
-                $newsletter_html .= sprintf(
-                    '<div class="wysiwyg-content">%s</div>',
-                    wp_kses_post($content)
-                );
+            if (!is_array($post_data) || empty($post_data['ID'])) {
+                error_log("Invalid post data structure in preview generation");
+                continue;
             }
 
-            $newsletter_html .= '</div>';
+            $block_content = $template_content;
+
+            // Handle conditional thumbnail tags
+            if (!empty($post_data['thumbnail_url'])) {
+                $block_content = preg_replace('/\{if_thumbnail\}(.*?)\{\/if_thumbnail\}/s', '$1', $block_content);
+            } else {
+                $block_content = preg_replace('/\{if_thumbnail\}.*?\{\/if_thumbnail\}/s', '', $block_content);
+            }
+
+            try {
+                $replacements = [
+                    '{title}'         => esc_html($post_data['title']),
+                    '{content}'       => wp_kses_post($post_data['content']),
+                    '{thumbnail_url}' => esc_url($post_data['thumbnail_url']),
+                    '{permalink}'     => esc_url($post_data['permalink']),
+                    '{excerpt}'       => wp_kses_post(!empty($post_data['excerpt']) ? $post_data['excerpt'] : wp_trim_words($post_data['content'], 55)),
+                    '{author}'        => esc_html($post_data['author_name']),
+                    '{publish_date}'  => esc_html(get_the_date('', $post_data['ID'])),
+                    '{categories}'    => esc_html(implode(', ', wp_get_post_categories($post_data['ID'], ['fields' => 'names'])))
+                ];
+
+                $newsletter_html .= strtr($block_content, $replacements);
+            } catch (Exception $e) {
+                error_log("Error processing post ID: " . $post_data['ID'] . " - " . $e->getMessage());
+                continue;
+            }
+        }
+    }
+} elseif ($block_data['type'] === 'html') {
+    $newsletter_html .= wp_kses_post(wp_unslash($block_data['html']));
+} elseif ($block_data['type'] === 'wysiwyg') {
+    $content = isset($block_data['wysiwyg']) ? $block_data['wysiwyg'] : '';
+    $newsletter_html .= sprintf(
+        '<div class="wysiwyg-content">%s</div>',
+        wp_kses_post($content)
+    );
+}
+
+$newsletter_html .= '</div>';
         }
 
         if (!empty($custom_footer)) {

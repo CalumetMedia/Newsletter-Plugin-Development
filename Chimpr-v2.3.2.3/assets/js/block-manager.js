@@ -3,21 +3,55 @@
     window.blockManagerInitialized = false;
     let globalUpdateInProgress = false;
     
+    // Update block indices after sorting
+    window.updateBlockIndices = function() {
+        console.log('Updating block indices');
+        $('#blocks-container .block-item').each(function(index) {
+            $(this).data('index', index);
+            $(this).find('input, select, textarea').each(function() {
+                var name = $(this).attr('name');
+                if (name) {
+                    $(this).attr('name', name.replace(/blocks\[\d+\]/, 'blocks[' + index + ']'));
+                }
+            });
+        });
+        
+        // Trigger preview update after reordering
+        if (!globalUpdateInProgress) {
+            globalUpdateInProgress = true;
+            setTimeout(() => {
+                updatePreview('block_reorder');
+                globalUpdateInProgress = false;
+            }, 250);
+        }
+    };
+    
     // Initialize sortable for posts
     window.initializeSortable = function(block) {
         var sortableList = block.find('ul.sortable-posts');
         if (sortableList.length) {
+            // Destroy existing sortable if it exists
+            if (sortableList.hasClass('ui-sortable')) {
+                sortableList.sortable('destroy');
+            }
+            
             sortableList.sortable({
                 handle: '.story-drag-handle',
                 update: function(event, ui) {
-                    if (globalUpdateInProgress) return;
+                    console.log('Sortable update triggered');
+                    if (globalUpdateInProgress) {
+                        console.log('Update in progress, skipping...');
+                        return;
+                    }
                     
                     var $block = ui.item.closest('.block-item');
+                    console.log('Updating post orders...');
                     
                     sortableList.find('li').each(function(index) {
                         $(this).find('.post-order').val(index);
                     });
                     
+                    console.log('Triggering preview update for sortable change');
                     globalUpdateInProgress = true;
                     setTimeout(() => {
                         updatePreview('sortable_update');
@@ -51,44 +85,155 @@
         }
     };
 
-    // Initialize events for a block
-    window.initializeBlockEvents = function(block) {
-        // Initial setup
+    // Initialize a single block with all necessary handlers and setup
+    window.initializeBlock = function(block) {
+        // Initialize sortable functionality
         initializeSortable(block);
+        
+        // Initialize WYSIWYG editors in this block
+        block.find('.wysiwyg-editor-content').each(function() {
+            var editorId = $(this).attr('id');
+            if (typeof wp !== 'undefined' && wp.editor && editorId) {
+                // Remove any existing editor first
+                wp.editor.remove(editorId);
+                
+                // Initialize the editor
+                wp.editor.initialize(editorId, {
+                    tinymce: {
+                        wpautop: true,
+                        plugins: 'paste,lists,link,textcolor,wordpress,wplink,hr,charmap,wptextpattern',
+                        toolbar1: 'formatselect,bold,italic,bullist,numlist,link,unlink,forecolor,hr',
+                        setup: function(editor) {
+                            editor.on('change keyup paste input', function() {
+                                console.log('WYSIWYG editor content changed');
+                                if (globalUpdateInProgress) return;
+                                
+                                editor.save();
+                                globalUpdateInProgress = true;
+                                setTimeout(() => {
+                                    updatePreview('wysiwyg_content_change');
+                                    globalUpdateInProgress = false;
+                                }, 250);
+                            });
+                        }
+                    },
+                    quicktags: true,
+                    mediaButtons: true
+                });
+
+                // Handle direct textarea changes for HTML view
+                $('#' + editorId).on('change keyup paste input', function() {
+                    console.log('WYSIWYG textarea content changed');
+                    if (globalUpdateInProgress) return;
+                    
+                    globalUpdateInProgress = true;
+                    setTimeout(() => {
+                        updatePreview('wysiwyg_content_change');
+                        globalUpdateInProgress = false;
+                    }, 250);
+                });
+            }
+        });
+
+        // Add checkbox change handler for posts
+        block.find('.block-posts').off('change', 'input[type="checkbox"][name*="[posts]"][name*="[selected]"]')
+            .on('change', 'input[type="checkbox"][name*="[posts]"][name*="[selected]"]', function() {
+                console.log('Checkbox changed!');
+                if (globalUpdateInProgress) {
+                    console.log('Update in progress, skipping...');
+                    return;
+                }
+                
+                console.log('Triggering preview update for checkbox change');
+                globalUpdateInProgress = true;
+                setTimeout(() => {
+                    updatePreview('post_selection_change');
+                    globalUpdateInProgress = false;
+                }, 250);
+            });
+
+        // Story count change handler
+        block.find('.block-story-count').off('change').on('change', function() {
+            if (globalUpdateInProgress) return;
+            
+            globalUpdateInProgress = true;
+            const $block = $(this).closest('.block-item');
+            const categoryId = $block.find('.block-category').val();
+            const dateRange = $block.find('.block-date-range').val();
+            const blockIndex = $block.data('index');
+            const storyCount = $(this).val();
+
+            if (categoryId) {
+                loadBlockPosts($block, categoryId, blockIndex, dateRange, storyCount)
+                    .then(() => {
+                        setTimeout(() => {
+                            updatePreview('story_count_change');
+                            globalUpdateInProgress = false;
+                        }, 250);
+                    });
+            }
+        });
+
+        // Category and date range change handlers
+        block.find('.block-category, .block-date-range').off('change').on('change', function() {
+            if (globalUpdateInProgress) return;
+            
+            globalUpdateInProgress = true;
+            const $block = $(this).closest('.block-item');
+            const categoryId = $block.find('.block-category').val();
+            const dateRange = $block.find('.block-date-range').val();
+            const blockIndex = $block.data('index');
+            const storyCount = $block.find('.block-story-count').val();
+
+            if (categoryId) {
+                loadBlockPosts($block, categoryId, blockIndex, dateRange, storyCount)
+                    .then(() => {
+                        setTimeout(() => {
+                            updatePreview('category_date_change');
+                            globalUpdateInProgress = false;
+                        }, 250);
+                    });
+            }
+        });
+
+        // Block type change handler
+        block.find('.block-type').off('change').on('change', function() {
+            if (globalUpdateInProgress) return;
+            
+            var newBlockType = $(this).val();
+            handleBlockTypeChange(block, newBlockType);
+            
+            globalUpdateInProgress = true;
+            setTimeout(() => {
+                updatePreview('block_type_change');
+                globalUpdateInProgress = false;
+            }, 250);
+        });
+
+        // HTML block content change handler
+        block.find('.html-block textarea').off('input').on('input', function() {
+            if (globalUpdateInProgress) return;
+            
+            globalUpdateInProgress = true;
+            setTimeout(() => {
+                updatePreview('html_content_change');
+                globalUpdateInProgress = false;
+            }, 250);
+        });
+
+        // Initial block type setup
         var blockType = block.find('.block-type').val();
         handleBlockTypeChange(block, blockType);
-            
-        // Track initial state
-        const initialCategory = block.find('.block-category').val();
-        const initialStoryCount = block.find('.block-story-count').val();
 
-        // Only do initial load if needed and if not already loaded
+        // Initial category load if needed
+        const initialCategory = block.find('.block-category').val();
         if (initialCategory && !block.data('posts-loaded')) {
             const dateRange = block.find('.block-date-range').val();
             const blockIndex = block.data('index');
             const storyCount = block.find('.block-story-count').val();
-
-            // Mark block as loaded
             block.data('posts-loaded', true);
-
-            // Create a promise wrapper
-            return new Promise((resolve) => {
-                loadBlockPosts(block, initialCategory, blockIndex, dateRange, storyCount)
-                    .then(() => {
-                        if (!globalUpdateInProgress) {
-                            globalUpdateInProgress = true;
-                            setTimeout(() => {
-                                updatePreview('initial_block_load');
-                                globalUpdateInProgress = false;
-                                resolve();
-                            }, 250);
-                        } else {
-                            resolve();
-                        }
-                    });
-            });
+            loadBlockPosts(block, initialCategory, blockIndex, dateRange, storyCount);
         }
-        return Promise.resolve();
     };
 
     // Load block posts via AJAX
@@ -152,9 +297,10 @@
                         $postsContainer.append($temp.children());
                         console.log('New content appended');
                         
-                        // Initialize sortable
-                        console.log('Initializing sortable...');
+                        // Initialize sortable and event handlers
+                        console.log('Initializing sortable and event handlers...');
                         initializeSortable(block);
+                        initializeBlock(block);
                         
                         // Trigger preview update
                         if (!globalUpdateInProgress) {
@@ -183,6 +329,67 @@
 
     // Event handlers for blocks
     function setupBlockEventHandlers(block) {
+        // Initialize WYSIWYG editors in this block
+        block.find('.wysiwyg-editor-content').each(function() {
+            var editorId = $(this).attr('id');
+            if (typeof wp !== 'undefined' && wp.editor && editorId) {
+                // Remove any existing editor first
+                wp.editor.remove(editorId);
+                
+                // Initialize the editor
+                wp.editor.initialize(editorId, {
+                    tinymce: {
+                        wpautop: true,
+                        plugins: 'paste,lists,link,textcolor,wordpress,wplink,hr,charmap,wptextpattern',
+                        toolbar1: 'formatselect,bold,italic,bullist,numlist,link,unlink,forecolor,hr',
+                        setup: function(editor) {
+                            editor.on('change keyup paste input', function() {
+                                console.log('WYSIWYG editor content changed');
+                                if (globalUpdateInProgress) return;
+                                
+                                editor.save();
+                                globalUpdateInProgress = true;
+                                setTimeout(() => {
+                                    updatePreview('wysiwyg_content_change');
+                                    globalUpdateInProgress = false;
+                                }, 250);
+                            });
+                        }
+                    },
+                    quicktags: true,
+                    mediaButtons: true
+                });
+
+                // Handle direct textarea changes for HTML view
+                $('#' + editorId).on('change keyup paste input', function() {
+                    console.log('WYSIWYG textarea content changed');
+                    if (globalUpdateInProgress) return;
+                    
+                    globalUpdateInProgress = true;
+                    setTimeout(() => {
+                        updatePreview('wysiwyg_content_change');
+                        globalUpdateInProgress = false;
+                    }, 250);
+                });
+            }
+        });
+
+        // Add checkbox change handler for posts
+        block.find('.block-posts').off('change', 'input[type="checkbox"][name*="[posts]"][name*="[selected]"]').on('change', 'input[type="checkbox"][name*="[posts]"][name*="[selected]"]', function() {
+            console.log('Checkbox changed!');
+            if (globalUpdateInProgress) {
+                console.log('Update in progress, skipping...');
+                return;
+            }
+            
+            console.log('Triggering preview update for checkbox change');
+            globalUpdateInProgress = true;
+            setTimeout(() => {
+                updatePreview('post_selection_change');
+                globalUpdateInProgress = false;
+            }, 250);
+        });
+
         // Story count change handler
         block.find('.block-story-count').off('change').on('change', function() {
             if (globalUpdateInProgress) return;
@@ -344,7 +551,7 @@
                     <div class="story-count-row" style="margin-bottom: 10px;">
                         <label>Number of Stories:</label>
                         <select name="blocks[${blockIndex}][story_count]" class="block-story-count" style="width: 200px; height: 36px; line-height: 1.4; padding: 0 6px;">
-                            <option value="all">All</option>
+                            <option value="disable" selected>All</option>
                             ${Array.from({length: 10}, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}
                         </select>
                     </div>
@@ -373,27 +580,7 @@
         $('#blocks-container').append(blockHtml);
         var newBlock = $('#blocks-container .block-item').last();
         
-        // Initialize the WordPress editor if wp.editor is available
-        if (typeof wp !== 'undefined' && wp.editor) {
-            var editorId = 'wysiwyg-editor-' + blockIndex;
-            wp.editor.initialize(editorId, {
-                tinymce: {
-                    wpautop: true,
-                    plugins: 'paste,lists,link,textcolor,wordpress,wplink,hr,charmap,wptextpattern',
-                    toolbar1: 'formatselect,bold,italic,bullist,numlist,link,unlink,forecolor,hr',
-                    setup: function(editor) {
-                        editor.on('change', function() {
-                            editor.save();
-                            updatePreview('editor_content_change');
-                        });
-                    }
-                },
-                quicktags: true,
-                mediaButtons: true
-            });
-        }
-
-        initializeBlockEvents(newBlock);
+        initializeBlock(newBlock);
 
         // Reinitialize accordion for all blocks
         $("#blocks-container").accordion('destroy').accordion({
@@ -425,15 +612,9 @@
             });
         }
 
-        // Track initialization of blocks
-        var totalBlocks = $('#blocks-container .block-item').length;
-        var initializedBlocks = 0;
-        var loadPromises = [];
-
         // Initialize existing blocks
         $('#blocks-container .block-item').each(function() {
-            var $block = $(this);
-            initializeBlockEvents($block);
+            initializeBlock($(this));
         });
 
         // Remove block triggers a preview update

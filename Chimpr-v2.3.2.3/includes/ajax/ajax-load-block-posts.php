@@ -102,7 +102,7 @@ function newsletter_load_block_posts() {
             
             // Auto-check based on story count and order, or if previously selected
             $checked = '';
-            if ($story_count === 'all' || $index < intval($story_count) || $was_selected) {
+            if ($story_count === 'disable' || $was_selected || $index < intval($story_count)) {
                 $checked = 'checked';
             }
             

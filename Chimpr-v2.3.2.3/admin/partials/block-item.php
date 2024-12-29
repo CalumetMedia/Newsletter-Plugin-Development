@@ -126,7 +126,7 @@ if (!isset($block_templates['default'])) {
             <select name="blocks[<?php echo esc_attr($index); ?>][story_count]" 
                     class="block-story-count" 
                     style="width: 200px; height: 36px; line-height: 1.4; padding: 0 6px;">
-                <option value="all" <?php selected($current_story_count, 'all'); ?>><?php esc_html_e('All', 'newsletter'); ?></option>
+                <option value="disable" <?php selected($current_story_count, 'disable'); ?>><?php esc_html_e('All', 'newsletter'); ?></option>
                 <?php for ($i = 1; $i <= 10; $i++) : ?>
                     <option value="<?php echo $i; ?>" <?php selected($current_story_count, $i); ?>><?php echo $i; ?></option>
                 <?php endfor; ?>

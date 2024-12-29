@@ -21,8 +21,6 @@ function newsletter_generate_preview() {
         $saved_blocks = get_option("newsletter_blocks_$newsletter_slug", []);
         $saved_selections = isset($_POST['saved_selections']) ? json_decode(stripslashes($_POST['saved_selections']), true) : [];
 
-        error_log('Saved selections: ' . print_r($saved_selections, true));
-
         // Merge saved selections into blocks
         foreach ($saved_selections as $block_index => $block_data) {
             if (isset($saved_blocks[$block_index]) && isset($block_data['selections'])) {
@@ -38,8 +36,6 @@ function newsletter_generate_preview() {
             }
         }
 
-        error_log('Merged blocks: ' . print_r($saved_blocks, true));
-
         $preview_content = newsletter_generate_preview_content($newsletter_slug, $saved_blocks);
 
         $preview_html = '<div class="newsletter-preview-container">';
@@ -54,7 +50,6 @@ function newsletter_generate_preview() {
 
         wp_send_json_success($preview_html);
     } catch (Exception $e) {
-        error_log('Preview generation error: ' . $e->getMessage());
         wp_send_json_error('Error generating preview: ' . $e->getMessage());
     } finally {
         $is_generating = false;

@@ -175,8 +175,9 @@
         // Add checkbox change handler for posts
         block.find('.block-posts').off('change', 'input[type="checkbox"][name*="[posts]"][name*="[selected]"]')
             .on('change', 'input[type="checkbox"][name*="[posts]"][name*="[selected]"]', function() {
+                console.log('Checkbox changed!');
                 if (globalUpdateInProgress) {
-                    console.log('Update in progress, skipping checkbox change');
+                    console.log('Update in progress, skipping...');
                     return;
                 }
                 

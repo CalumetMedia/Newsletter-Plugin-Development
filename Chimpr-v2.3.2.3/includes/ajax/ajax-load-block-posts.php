@@ -138,7 +138,7 @@ function newsletter_load_block_posts() {
             
             $checked = '';
             if ($manual_override) {
-                // In manual mode, only use saved selections, ignore story count completely
+                // In manual mode, use saved selections
                 if (isset($saved_selections[$post_id])) {
                     $checked = (!empty($saved_selections[$post_id]['selected']) && $saved_selections[$post_id]['selected'] == 1) ? 'checked' : '';
                 }
@@ -146,6 +146,8 @@ function newsletter_load_block_posts() {
                 // In automatic mode, select based on story count
                 if ($story_count !== 'disable') {
                     $checked = ($index < intval($story_count)) ? 'checked' : '';
+                } else {
+                    $checked = 'checked';
                 }
             }
             
@@ -180,19 +182,9 @@ function newsletter_load_block_posts() {
         }
         $html .= '</ul>';
         
-        if ($story_count !== 'disable') {
-            $message = sprintf(
-                esc_html__('Showing %d most recent posts. Manual changes will switch to manual selection mode.', 'newsletter'),
-                intval($story_count)
-            );
-            $html .= '<p class="description">' . $message . '</p>';
-        } else {
-            $html .= '<p class="description">' . esc_html__('Showing all posts in date range.', 'newsletter') . '</p>';
-        }
-        
         wp_send_json_success($html);
     } else {
-        wp_send_json_success('<p>' . esc_html__('No posts found in the selected date range.', 'newsletter') . '</p>');
+        wp_send_json_success('<p>' . esc_html__('No posts found in this category.', 'newsletter') . '</p>');
     }
 }
 add_action('wp_ajax_load_block_posts', 'newsletter_load_block_posts');

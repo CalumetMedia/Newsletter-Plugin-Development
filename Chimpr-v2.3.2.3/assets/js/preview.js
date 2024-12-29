@@ -5,8 +5,6 @@
 
     // Save and update preview
     window.saveAndUpdatePreview = function(blockData, blockIndex) {
-        console.log('[Preview] Saving block data:', blockData);
-        
         var blocks = [];
         blocks[blockIndex] = blockData;
 
@@ -22,31 +20,23 @@
                 blocks: blocks
             },
             success: function(response) {
-                console.log('[Preview] Save response:', response);
                 if (response.success) {
-                    // Wait a moment for the save to be processed
                     setTimeout(() => {
                         if (typeof window.generatePreview === 'function') {
-                            console.log('[Preview] Calling generatePreview after save...');
                             window.generatePreview().then(() => {
-                                console.log('[Preview] Preview generated successfully');
                                 globalUpdateInProgress = false;
-                            }).catch(error => {
-                                console.error('[Preview] Error generating preview:', error);
+                            }).catch(() => {
                                 globalUpdateInProgress = false;
                             });
                         } else {
-                            console.error('[Preview] generatePreview function not found');
                             globalUpdateInProgress = false;
                         }
-                    }, 100); // Small delay to ensure save is processed
+                    }, 100);
                 } else {
-                    console.error('[Preview] Save failed:', response);
                     globalUpdateInProgress = false;
                 }
             },
-            error: function(xhr, status, error) {
-                console.error('[Preview] Save error:', { xhr, status, error });
+            error: function() {
                 globalUpdateInProgress = false;
             }
         });
@@ -57,8 +47,6 @@
         if (previewUpdatePromise) {
             return previewUpdatePromise;
         }
-
-        console.log('[Preview] Starting preview generation');
 
         // Store the current state of all checkboxes and their order
         var savedState = {};
@@ -83,16 +71,12 @@
                 var isChecked = $checkbox.is(':checked');
                 var order = $orderInput.length ? $orderInput.val() : '0';
                 
-                console.log('[Preview] Post state:', { blockIndex, postId, isChecked, order });
-                
                 savedState[blockIndex].selections[postId] = {
                     checked: isChecked,
                     order: order
                 };
             });
         });
-
-        console.log('[Preview] Collected state:', savedState);
 
         var formData = $('#blocks-form').serializeArray();
         formData.push({ name: 'action', value: 'generate_preview' });
@@ -107,7 +91,6 @@
             dataType: 'json',
             data: formData
         }).done(function(response) {
-            console.log('[Preview] Server response:', response);
             if (response.success) {
                 $('#preview-content').html(response.data);
                 
@@ -127,7 +110,6 @@
                                 var $orderInput = $li.find('.post-order');
                                 
                                 if ($checkbox.length) {
-                                    console.log('[Preview] Restoring checkbox state:', { postId, checked: selection.checked });
                                     $checkbox.prop('checked', selection.checked);
                                 }
                                 if ($orderInput.length) {
@@ -137,11 +119,7 @@
                         });
                     }
                 });
-            } else {
-                console.error('[Preview] Error in preview response:', response);
             }
-        }).fail(function(jqXHR, textStatus, errorThrown) {
-            console.error('[Preview] Error updating preview:', textStatus, errorThrown);
         }).always(function() {
             previewUpdatePromise = null;
         });
@@ -150,18 +128,14 @@
     };
 
     // Debounced updatePreview function
-    window.updatePreview = function(source) {
-        console.log('[Preview] Update requested from:', source);
-        
+    window.updatePreview = function() {
         // If there's already an update in progress, queue this one
         if (globalUpdateInProgress) {
-            console.log('[Preview] Update in progress, queueing update');
             if (window.updatePreviewTimeout) {
                 clearTimeout(window.updatePreviewTimeout);
             }
             
             window.updatePreviewTimeout = setTimeout(function() {
-                console.log('[Preview] Processing queued update');
                 generatePreview();
             }, 500);
             return;
@@ -182,14 +156,12 @@
             
             // If there's a queued update, process it
             if (window.updatePreviewTimeout) {
-                console.log('[Preview] Processing queued update after completion');
                 clearTimeout(window.updatePreviewTimeout);
                 window.updatePreviewTimeout = setTimeout(function() {
-                    updatePreview('queued_update');
+                    updatePreview();
                 }, 100);
             }
-        }).catch(function(error) {
-            console.error('[Preview] Error in preview update:', error);
+        }).catch(function() {
             globalUpdateInProgress = false;
         });
     };

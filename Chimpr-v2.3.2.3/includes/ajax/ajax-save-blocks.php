@@ -33,7 +33,7 @@ function newsletter_handle_blocks_form_submission() {
             $sanitized_block['category'] = isset($block['category']) ? intval($block['category']) : (isset($existing_blocks[$index]['category']) ? $existing_blocks[$index]['category'] : 0);
             
             // Initialize posts array
-            $sanitized_block['posts'] = isset($existing_blocks[$index]['posts']) ? $existing_blocks[$index]['posts'] : [];
+            $sanitized_block['posts'] = [];
             
             // Process new post data
             if (!empty($block['posts']) && is_array($block['posts'])) {
@@ -53,6 +53,11 @@ function newsletter_handle_blocks_form_submission() {
                         )
                     ];
                 }
+            }
+
+            // If NOT in manual override mode, preserve existing posts data
+            if (!$sanitized_block['manual_override'] && isset($existing_blocks[$index]['posts'])) {
+                $sanitized_block['posts'] = $existing_blocks[$index]['posts'];
             }
         } elseif ($block['type'] === 'wysiwyg' || (isset($existing_blocks[$index]['type']) && $existing_blocks[$index]['type'] === 'wysiwyg')) {
             // Handle WYSIWYG content

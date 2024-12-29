@@ -3,6 +3,12 @@ if (!defined('ABSPATH')) exit;
 
 if (!isset($block) || !isset($index)) return;
 
+// Initialize required variables
+$block_index = $index;
+$manual_override = isset($block['manual_override']) && $block['manual_override'];
+$story_count = isset($block['story_count']) ? $block['story_count'] : 'disable';
+$saved_selections = isset($block['posts']) ? $block['posts'] : [];
+
 $available_templates = get_option('newsletter_templates', []);
 $block_templates = array_filter($available_templates, function($template) {
     return isset($template['type']) && $template['type'] === 'block';
@@ -203,33 +209,55 @@ if (!isset($block_templates['default'])) {
                     $posts = get_posts($posts_args);
 
                     if ($posts) {
-                        $selected_posts = isset($block['posts']) ? $block['posts'] : [];
-                        usort($posts, function ($a, $b) use ($selected_posts) {
-                            $order_a = isset($selected_posts[$a->ID]['order']) ? intval($selected_posts[$a->ID]['order']) : PHP_INT_MAX;
-                            $order_b = isset($selected_posts[$b->ID]['order']) ? intval($selected_posts[$b->ID]['order']) : PHP_INT_MAX;
-                            return $order_a - $order_b;
-                        });
-                        echo '<ul class="sortable-posts" ' . (!isset($block['manual_override']) || !$block['manual_override'] ? 'style="pointer-events: none; opacity: 0.7;"' : '') . '>';
-                        foreach ($posts as $post) {
+                        echo '<ul class="sortable-posts"' . (!$manual_override ? ' style="pointer-events: none; opacity: 0.7;"' : '') . '>';
+                        
+                        foreach ($posts as $post_index => $post) {
                             $post_id = $post->ID;
-                            $checked = isset($selected_posts[$post_id]['selected']) ? 'checked' : '';
-                            $thumbnail_url = get_the_post_thumbnail_url($post_id, 'thumbnail') ?: '';
-                            $order = isset($selected_posts[$post_id]['order']) ? intval($selected_posts[$post_id]['order']) : PHP_INT_MAX;
+                            $checked = '';
+                            
+                            if ($manual_override) {
+                                // In manual mode, use saved selections
+                                if (isset($saved_selections[$post_id])) {
+                                    $checked = (!empty($saved_selections[$post_id]['selected']) && $saved_selections[$post_id]['selected'] == 1) ? 'checked' : '';
+                                }
+                            } else {
+                                // In automatic mode, select based on story count
+                                if ($story_count !== 'disable') {
+                                    $checked = ($post_index < intval($story_count)) ? 'checked' : '';
+                                } else {
+                                    $checked = 'checked';
+                                }
+                            }
+
+                            // Get the order value from saved selections or use index
+                            $order = isset($saved_selections[$post_id]['order']) ? intval($saved_selections[$post_id]['order']) : $post_index;
+                            
                             ?>
-                            <li data-post-id="<?php echo esc_attr($post_id); ?>">
-                                <span class="dashicons dashicons-sort story-drag-handle" style="cursor: move; margin-right: 10px;"></span>
+                            <li data-post-id="<?php echo esc_attr($post_id); ?>" class="sortable-post-item">
+                                <span class="dashicons dashicons-sort story-drag-handle" style="cursor: <?php echo !$manual_override ? 'default' : 'move'; ?>; margin-right: 10px;"></span>
                                 <label>
                                     <input type="checkbox" 
-                                           name="blocks[<?php echo esc_attr($index); ?>][posts][<?php echo esc_attr($post_id); ?>][selected]" 
+                                           name="blocks[<?php echo esc_attr($block_index); ?>][posts][<?php echo esc_attr($post_id); ?>][selected]" 
                                            value="1" 
-                                           <?php echo $checked; ?>
-                                           <?php echo (!isset($block['manual_override']) || !$block['manual_override'] ? 'disabled' : ''); ?>> 
-                                    <?php if ($thumbnail_url): ?>
-                                        <img src="<?php echo esc_url($thumbnail_url); ?>" alt="<?php echo esc_attr($post->post_title); ?>" style="width:50px; height:auto; margin-right:10px; vertical-align: middle;">
-                                    <?php endif; ?>
-                                    <?php echo esc_html($post->post_title); ?>
+                                           <?php echo $checked; ?> 
+                                           <?php echo !$manual_override ? 'disabled' : ''; ?>> 
+                                    <?php 
+                                    $thumbnail_url = get_the_post_thumbnail_url($post_id, 'thumbnail');
+                                    if ($thumbnail_url) {
+                                        echo '<img src="' . esc_url($thumbnail_url) . '" 
+                                                  alt="' . esc_attr($post->post_title) . '" 
+                                                  style="width:50px; height:auto; margin-right:10px; vertical-align: middle;">';
+                                    }
+                                    echo esc_html($post->post_title);
+                                    if ($post->post_status === 'future') {
+                                        echo '<span class="newsletter-status schedule" style="margin-left:10px;">SCHEDULED</span>';
+                                    }
+                                    ?>
                                 </label>
-                                <input type="hidden" class="post-order" name="blocks[<?php echo esc_attr($index); ?>][posts][<?php echo esc_attr($post_id); ?>][order]" value="<?php echo esc_attr($order); ?>">
+                                <input type="hidden" 
+                                       class="post-order" 
+                                       name="blocks[<?php echo esc_attr($block_index); ?>][posts][<?php echo esc_attr($post_id); ?>][order]" 
+                                       value="<?php echo esc_attr($order); ?>">
                             </li>
                             <?php
                         }
@@ -244,7 +272,7 @@ if (!isset($block_templates['default'])) {
             </div>
         </div>
 
-        <!-- Add JavaScript for manual override functionality -->
+        <!-- Manual Override Script -->
         <script>
         jQuery(document).ready(function($) {
             var blockIndex = <?php echo esc_js($index); ?>;
@@ -252,30 +280,21 @@ if (!isset($block_templates['default'])) {
             var $postsList = $manualOverride.closest('.block-item').find('.sortable-posts');
             var $checkboxes = $postsList.find('input[type="checkbox"]');
             
-            // Function to update the interactive state
             function updateInteractiveState(isManual) {
-                // Update visual state
                 $postsList.css({
                     'pointer-events': isManual ? 'auto' : 'none',
                     'opacity': isManual ? '1' : '0.7'
                 });
-                
-                // Enable/disable checkboxes
                 $checkboxes.prop('disabled', !isManual);
-                
-                // Update drag handles cursor
                 $postsList.find('.story-drag-handle').css('cursor', isManual ? 'move' : 'default');
             }
 
-            // Initialize the state based on current manual override value
             updateInteractiveState($manualOverride.prop('checked'));
 
-            // Handle manual override toggle
             $manualOverride.on('change', function() {
                 var isManual = $(this).prop('checked');
                 updateInteractiveState(isManual);
                 
-                // If switching to automatic mode, trigger a reload of posts
                 if (!isManual) {
                     const dateRange = $(this).closest('.block-item').find('.block-date-range').val();
                     const categoryId = $(this).closest('.block-item').find('.block-category').val();

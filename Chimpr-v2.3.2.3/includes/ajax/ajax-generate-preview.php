@@ -23,16 +23,34 @@ function newsletter_generate_preview() {
 
         // Merge saved selections into blocks
         foreach ($saved_selections as $block_index => $block_data) {
-            if (isset($saved_blocks[$block_index]) && isset($block_data['selections'])) {
-                $saved_blocks[$block_index]['posts'] = [];
-                foreach ($block_data['selections'] as $post_id => $selection) {
-                    $saved_blocks[$block_index]['posts'][$post_id] = [
-                        'selected' => $selection['checked'] ? 1 : 0,
-                        'order' => $selection['order']
-                    ];
+            if (isset($saved_blocks[$block_index])) {
+                // Handle posts if they exist
+                if (isset($block_data['selections'])) {
+                    $saved_blocks[$block_index]['posts'] = [];
+                    foreach ($block_data['selections'] as $post_id => $selection) {
+                        $saved_blocks[$block_index]['posts'][$post_id] = [
+                            'selected' => $selection['checked'] ? 1 : 0,
+                            'order' => $selection['order']
+                        ];
+                    }
                 }
-                $saved_blocks[$block_index]['manual_override'] = $block_data['manual_override'];
-                $saved_blocks[$block_index]['story_count'] = $block_data['storyCount'];
+                
+                // Copy over basic block settings
+                $saved_blocks[$block_index]['manual_override'] = isset($block_data['manual_override']) ? $block_data['manual_override'] : 0;
+                $saved_blocks[$block_index]['story_count'] = isset($block_data['story_count']) ? $block_data['story_count'] : 'disable';
+                if (isset($block_data['template_id'])) {
+                    $saved_blocks[$block_index]['template_id'] = $block_data['template_id'];
+                }
+                
+                // Handle WYSIWYG and HTML content
+                if (isset($block_data['type'])) {
+                    $saved_blocks[$block_index]['type'] = $block_data['type'];
+                    if ($block_data['type'] === 'wysiwyg' && isset($block_data['wysiwyg'])) {
+                        $saved_blocks[$block_index]['wysiwyg'] = wp_kses_post($block_data['wysiwyg']);
+                    } elseif ($block_data['type'] === 'html' && isset($block_data['html'])) {
+                        $saved_blocks[$block_index]['html'] = wp_kses_post($block_data['html']);
+                    }
+                }
             }
         }
 

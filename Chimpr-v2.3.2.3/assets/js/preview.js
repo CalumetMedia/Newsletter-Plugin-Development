@@ -48,21 +48,40 @@
             return previewUpdatePromise;
         }
 
+        // Store editor states before preview update
+        var editorStates = {};
+        $('.block-item').each(function() {
+            var $block = $(this);
+            var blockIndex = $block.data('index');
+            var editorId = 'wysiwyg-editor-' + blockIndex;
+            if (typeof tinyMCE !== 'undefined' && tinyMCE.get(editorId)) {
+                var editor = tinyMCE.get(editorId);
+                var state = {
+                    content: editor.getContent()
+                };
+                
+                // Only try to get selection if editor is initialized and focused
+                try {
+                    if (editor.selection && editor.selection.getBookmark && !editor.isHidden()) {
+                        state.selection = editor.selection.getBookmark(2, true);
+                    }
+                } catch(e) {
+                    console.log('Could not get editor selection for', editorId);
+                }
+                
+                editorStates[editorId] = state;
+            }
+        });
+
         // Store the current state of all checkboxes and their order
         var savedState = {};
         $('.block-item').each(function() {
             var $block = $(this);
             var blockIndex = $block.data('index');
-            var categoryId = $block.find('.block-category').val();
-            var storyCount = $block.find('.block-story-count').val();
-            var manualOverride = $block.find('input[name*="[manual_override]"]').prop('checked');
+            var blockData = window.collectBlockData($block);
             
-            savedState[blockIndex] = {
-                storyCount: storyCount,
-                category: categoryId,
-                manual_override: manualOverride ? 1 : 0,
-                selections: {}
-            };
+            savedState[blockIndex] = blockData;
+            savedState[blockIndex].selections = {};
             
             $block.find('input[type="checkbox"][name*="[posts]"][name*="[selected]"]').each(function() {
                 var $checkbox = $(this);
@@ -94,14 +113,39 @@
             if (response.success) {
                 $('#preview-content').html(response.data);
                 
-                // Restore state after preview loads
+                // Restore editor states after preview update
                 $('.block-item').each(function() {
                     var $block = $(this);
                     var blockIndex = $block.data('index');
                     var state = savedState[blockIndex];
+                    var editorId = 'wysiwyg-editor-' + blockIndex;
                     
                     if (state) {
                         $block.find('.block-story-count').val(state.storyCount);
+                        if (state.template_id) {
+                            $block.find('.block-template').val(state.template_id);
+                        }
+                        
+                        // Only restore WYSIWYG content if editor exists and content changed
+                        if (state.type === 'wysiwyg' && state.wysiwyg !== undefined) {
+                            if (editorStates[editorId] && typeof tinyMCE !== 'undefined' && tinyMCE.get(editorId)) {
+                                var editor = tinyMCE.get(editorId);
+                                var currentContent = editor.getContent();
+                                if (currentContent !== state.wysiwyg) {
+                                    editor.setContent(state.wysiwyg);
+                                    try {
+                                        if (editorStates[editorId].selection && editor.selection && !editor.isHidden()) {
+                                            editor.selection.moveToBookmark(editorStates[editorId].selection);
+                                        }
+                                    } catch(e) {
+                                        console.log('Could not restore editor selection for', editorId);
+                                    }
+                                }
+                            }
+                        } else if (state.type === 'html' && state.html !== undefined) {
+                            $block.find('.html-block textarea').val(state.html);
+                        }
+
                         Object.keys(state.selections).forEach(function(postId) {
                             var selection = state.selections[postId];
                             var $li = $block.find('li[data-post-id="' + postId + '"]');

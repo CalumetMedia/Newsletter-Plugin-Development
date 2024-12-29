@@ -113,11 +113,57 @@
             block.find('.html-block').show();
         } else if (blockType === 'wysiwyg') {
             block.find('.wysiwyg-block').show();
+            // Get the editor ID for this block
+            var blockIndex = block.data('index');
+            var editorId = 'wysiwyg-editor-' + blockIndex;
+            
+            // Only initialize if editor doesn't exist
+            if (typeof wp !== 'undefined' && wp.editor && !tinyMCE.get(editorId)) {
+                // Initialize the editor after a short delay to ensure the container is visible
+                setTimeout(function() {
+                    if (typeof wp !== 'undefined' && wp.editor && wp.editor.initialize) {
+                        wp.editor.initialize(editorId, {
+                            tinymce: {
+                                wpautop: true,
+                                plugins: 'paste,lists,link,textcolor,wordpress,wplink,hr,charmap,wptextpattern',
+                                toolbar1: 'formatselect,bold,italic,bullist,numlist,link,unlink,forecolor,hr',
+                                setup: function(editor) {
+                                    var updateTimeout;
+                                    editor.on('change keyup paste input', function() {
+                                        if (globalUpdateInProgress) return;
+                                        
+                                        // Clear any existing timeout
+                                        if (updateTimeout) {
+                                            clearTimeout(updateTimeout);
+                                        }
+                                        
+                                        // Set a new timeout for the update
+                                        updateTimeout = setTimeout(() => {
+                                            if (!globalUpdateInProgress) {
+                                                globalUpdateInProgress = true;
+                                                editor.save();
+                                                updatePreview('wysiwyg_content_change');
+                                                globalUpdateInProgress = false;
+                                            }
+                                        }, 1000); // Longer delay for typing
+                                    });
+                                }
+                            },
+                            quicktags: true,
+                            mediaButtons: true
+                        });
+                    }
+                }, 100);
+            }
         }
     };
 
     // Initialize a single block with all necessary handlers and setup
     window.initializeBlock = function(block) {
+        // Store initial story count value
+        var initialStoryCount = block.find('.block-story-count').val();
+        console.log('Initial block setup - Story count:', { blockIndex: block.data('index'), value: initialStoryCount });
+        
         // Initialize sortable functionality
         initializeSortable(block);
         
@@ -127,103 +173,193 @@
         $storyCount.prop('disabled', isManual);
         $storyCount.css('opacity', isManual ? '0.7' : '1');
         
-        // Initialize WYSIWYG editors in this block
+        // Set initial visual state for posts list based on manual override
+        var $postsList = block.find('.sortable-posts');
+        $postsList.css({
+            'pointer-events': isManual ? 'auto' : 'none',
+            'opacity': isManual ? '1' : '0.7'
+        });
+        
+        // Set initial state for post checkboxes
+        $postsList.find('input[type="checkbox"]').prop('disabled', !isManual);
+        
+        // Store the initial story count as data attribute
+        block.data('initial-story-count', initialStoryCount);
+        
+        // Initialize WYSIWYG editors in this block if they don't exist
         block.find('.wysiwyg-editor-content').each(function() {
             var editorId = $(this).attr('id');
-            if (typeof wp !== 'undefined' && wp.editor && editorId) {
-                // Remove any existing editor first
-                wp.editor.remove(editorId);
-                
-                // Initialize the editor
+            if (typeof wp !== 'undefined' && wp.editor && editorId && !tinyMCE.get(editorId)) {
                 wp.editor.initialize(editorId, {
                     tinymce: {
                         wpautop: true,
                         plugins: 'paste,lists,link,textcolor,wordpress,wplink,hr,charmap,wptextpattern',
                         toolbar1: 'formatselect,bold,italic,bullist,numlist,link,unlink,forecolor,hr',
                         setup: function(editor) {
+                            var updateTimeout;
                             editor.on('change keyup paste input', function() {
-                                console.log('WYSIWYG editor content changed');
                                 if (globalUpdateInProgress) return;
                                 
-                                editor.save();
-                                globalUpdateInProgress = true;
-                                setTimeout(() => {
-                                    updatePreview('wysiwyg_content_change');
-                                    globalUpdateInProgress = false;
-                                }, 250);
+                                // Clear any existing timeout
+                                if (updateTimeout) {
+                                    clearTimeout(updateTimeout);
+                                }
+                                
+                                // Set a new timeout for the update
+                                updateTimeout = setTimeout(() => {
+                                    if (!globalUpdateInProgress) {
+                                        globalUpdateInProgress = true;
+                                        editor.save();
+                                        updatePreview('wysiwyg_content_change');
+                                        globalUpdateInProgress = false;
+                                    }
+                                }, 1000); // Longer delay for typing
                             });
                         }
                     },
                     quicktags: true,
                     mediaButtons: true
                 });
-
-                // Handle direct textarea changes for HTML view
-                $('#' + editorId).on('change keyup paste input', function() {
-                    console.log('WYSIWYG textarea content changed');
-                    if (globalUpdateInProgress) return;
-                    
-                    globalUpdateInProgress = true;
-                    setTimeout(() => {
-                        updatePreview('wysiwyg_content_change');
-                        globalUpdateInProgress = false;
-                    }, 250);
-                });
             }
+        });
+
+        // Add event handlers
+        setupBlockEventHandlers(block);
+
+        // Initial category load if needed
+        const initialCategory = block.find('.block-category').val();
+        if (initialCategory && !block.data('posts-loaded')) {
+            const dateRange = block.find('.block-date-range').val();
+            const blockIndex = block.data('index');
+            block.data('posts-loaded', true);
+            
+            // Use the stored initial story count for the initial load
+            loadBlockPosts(block, initialCategory, blockIndex, dateRange, initialStoryCount)
+                .then(() => {
+                    // Verify story count after initial load
+                    var currentStoryCount = block.find('.block-story-count').val();
+                    console.log('After initial load - Story count:', { 
+                        blockIndex: blockIndex, 
+                        initial: initialStoryCount,
+                        current: currentStoryCount 
+                    });
+                    if (currentStoryCount !== initialStoryCount) {
+                        block.find('.block-story-count').val(initialStoryCount);
+                    }
+                    
+                    // Re-apply visual state after load
+                    $postsList.css({
+                        'pointer-events': isManual ? 'auto' : 'none',
+                        'opacity': isManual ? '1' : '0.7'
+                    });
+                    $postsList.find('input[type="checkbox"]').prop('disabled', !isManual);
+                });
+        }
+    };
+
+    // Event handlers for blocks
+    function setupBlockEventHandlers(block) {
+        // Add template change handler
+        block.find('.block-template').off('change').on('change', function() {
+            if (globalUpdateInProgress) return;
+            
+            globalUpdateInProgress = true;
+            setTimeout(() => {
+                updatePreview('template_change');
+                globalUpdateInProgress = false;
+            }, 250);
+        });
+
+        // Story count change handler
+        block.find('.block-story-count').off('change').on('change', function() {
+            if (globalUpdateInProgress) return;
+            
+            globalUpdateInProgress = true;
+            const $block = $(this).closest('.block-item');
+            const categoryId = $block.find('.block-category').val();
+            const dateRange = $block.find('.block-date-range').val();
+            const blockIndex = $block.data('index');
+            const storyCount = $(this).val();
+            console.log('Story count changed:', { blockIndex, oldValue: $block.data('last-story-count'), newValue: storyCount });
+            $block.data('last-story-count', storyCount);
+
+            if (categoryId) {
+                loadBlockPosts($block, categoryId, blockIndex, dateRange, storyCount)
+                    .then(() => {
+                        setTimeout(() => {
+                            // Verify story count wasn't changed during load
+                            const currentStoryCount = $block.find('.block-story-count').val();
+                            console.log('Story count after load:', { blockIndex, value: currentStoryCount, expected: storyCount });
+                            if (currentStoryCount !== storyCount) {
+                                $block.find('.block-story-count').val(storyCount);
+                            }
+                            updatePreview('story_count_change');
+                            globalUpdateInProgress = false;
+                        }, 250);
+                    });
+            } else {
+                globalUpdateInProgress = false;
+            }
+        });
+
+        // Category and date range change handlers
+        block.find('.block-category, .block-date-range').off('change').on('change', function() {
+            if (globalUpdateInProgress) return;
+            
+            globalUpdateInProgress = true;
+            const $block = $(this).closest('.block-item');
+            const categoryId = $block.find('.block-category').val();
+            const dateRange = $block.find('.block-date-range').val();
+            const blockIndex = $block.data('index');
+            const storyCount = $block.find('.block-story-count').val();
+
+            if (categoryId) {
+                loadBlockPosts($block, categoryId, blockIndex, dateRange, storyCount)
+                    .then(() => {
+                        setTimeout(() => {
+                            updatePreview('category_date_change');
+                            globalUpdateInProgress = false;
+                        }, 250);
+                    });
+            } else {
+                globalUpdateInProgress = false;
+            }
+        });
+
+        // Block type change handler
+        block.find('.block-type').off('change').on('change', function() {
+            if (globalUpdateInProgress) return;
+            
+            var newBlockType = $(this).val();
+            handleBlockTypeChange(block, newBlockType);
+            
+            globalUpdateInProgress = true;
+            setTimeout(() => {
+                updatePreview('block_type_change');
+                globalUpdateInProgress = false;
+            }, 250);
         });
 
         // Add checkbox change handler for posts
         block.find('.block-posts').off('change', 'input[type="checkbox"][name*="[posts]"][name*="[selected]"]')
             .on('change', 'input[type="checkbox"][name*="[posts]"][name*="[selected]"]', function() {
-                console.log('Checkbox changed!');
-                if (globalUpdateInProgress) {
-                    console.log('Update in progress, skipping...');
-                    return;
-                }
+                if (globalUpdateInProgress) return;
                 
                 var $block = $(this).closest('.block-item');
                 var blockIndex = $block.data('index');
                 var manualOverride = $block.find('input[name*="[manual_override]"]').prop('checked');
 
                 // Only process changes if in manual override mode
-                if (!manualOverride) {
-                    console.log('Not in manual override mode, ignoring change');
-                    return;
-                }
+                if (!manualOverride) return;
 
                 // Create a blocks array to match the expected server-side structure
                 var blocks = [];
                 
                 // Get all block data
-                var blockData = {
-                    type: $block.find('.block-type').val(),
-                    title: $block.find('.block-title-input').val(),
-                    show_title: $block.find('.show-title-toggle').prop('checked') ? 1 : 0,
-                    template_id: $block.find('.block-template').val(),
-                    category: $block.find('.block-category').val(),
-                    date_range: $block.find('.block-date-range').val(),
-                    story_count: $block.find('.block-story-count').val(),
-                    manual_override: manualOverride ? 1 : 0,
-                    posts: {}
-                };
-
-                // Collect all post data for this block
-                $block.find('.block-posts li').each(function() {
-                    var $post = $(this);
-                    var postId = $post.data('post-id');
-                    var $postCheckbox = $post.find('input[type="checkbox"][name*="[selected]"]');
-                    var $orderInput = $post.find('.post-order');
-                    var isChecked = $postCheckbox.prop('checked');
-                    
-                    blockData.posts[postId] = {
-                        selected: isChecked ? 1 : 0,
-                        order: $orderInput.val() || '9223372036854775807'
-                    };
-                });
+                var blockData = collectBlockData($block);
+                blockData.posts = collectPostData($block);
 
                 blocks[blockIndex] = blockData;
-
-                console.log('Saving block data:', blockData);
 
                 // Save via AJAX and update preview
                 globalUpdateInProgress = true;
@@ -238,31 +374,21 @@
                         blocks: blocks
                     },
                     success: function(response) {
-                        console.log('Save response:', response);
                         if (response.success) {
-                            // Wait a moment for the save to be processed
                             setTimeout(() => {
                                 if (typeof window.generatePreview === 'function') {
-                                    console.log('Calling generatePreview after save...');
                                     window.generatePreview().then(() => {
-                                        console.log('Preview generated successfully');
-                                        globalUpdateInProgress = false;
-                                    }).catch(error => {
-                                        console.error('Error generating preview:', error);
                                         globalUpdateInProgress = false;
                                     });
                                 } else {
-                                    console.error('generatePreview function not found');
                                     globalUpdateInProgress = false;
                                 }
-                            }, 100); // Small delay to ensure save is processed
+                            }, 100);
                         } else {
-                            console.error('Save failed:', response);
                             globalUpdateInProgress = false;
                         }
                     },
-                    error: function(xhr, status, error) {
-                        console.error('Save error:', { xhr, status, error });
+                    error: function() {
                         globalUpdateInProgress = false;
                     }
                 });
@@ -271,7 +397,7 @@
         // Add manual override change handler
         block.find('input[name*="[manual_override]"]').off('change').on('change', function() {
             if (globalUpdateInProgress) return;
-
+            
             var isManual = $(this).prop('checked');
             var $block = $(this).closest('.block-item');
             var $postsList = block.find('.sortable-posts');
@@ -298,21 +424,16 @@
             $storyCount.prop('disabled', isManual);
             $storyCount.css('opacity', isManual ? '0.7' : '1');
 
+            // Store the current story count before any changes
+            var currentStoryCount = $storyCount.val();
+            $block.data('pre-override-story-count', currentStoryCount);
+
             // Create blocks array for saving
             var blocks = [];
             
             // Get all block data
-            var blockData = {
-                type: $block.find('.block-type').val(),
-                title: $block.find('.block-title-input').val(),
-                show_title: $block.find('.show-title-toggle').prop('checked') ? 1 : 0,
-                template_id: $block.find('.block-template').val(),
-                category: $block.find('.block-category').val(),
-                date_range: $block.find('.block-date-range').val(),
-                story_count: $block.find('.block-story-count').val(),
-                manual_override: isManual ? 1 : 0,
-                posts: {}
-            };
+            var blockData = collectBlockData($block);
+            blockData.manual_override = isManual ? 1 : 0;
 
             // If switching to manual mode, save the unchecked state
             if (isManual) {
@@ -422,96 +543,31 @@
                 }
             }
         });
-
-        // Story count change handler
-        block.find('.block-story-count').off('change').on('change', function() {
-            if (globalUpdateInProgress) return;
-            
-            globalUpdateInProgress = true;
-            const $block = $(this).closest('.block-item');
-            const categoryId = $block.find('.block-category').val();
-            const dateRange = $block.find('.block-date-range').val();
-            const blockIndex = $block.data('index');
-            const storyCount = $(this).val();
-
-            if (categoryId) {
-                loadBlockPosts($block, categoryId, blockIndex, dateRange, storyCount)
-                    .then(() => {
-                        setTimeout(() => {
-                            updatePreview('story_count_change');
-                            globalUpdateInProgress = false;
-                        }, 250);
-                    });
-            }
-        });
-
-        // Category and date range change handlers
-        block.find('.block-category, .block-date-range').off('change').on('change', function() {
-            if (globalUpdateInProgress) return;
-            
-            globalUpdateInProgress = true;
-            const $block = $(this).closest('.block-item');
-            const categoryId = $block.find('.block-category').val();
-            const dateRange = $block.find('.block-date-range').val();
-            const blockIndex = $block.data('index');
-            const storyCount = $block.find('.block-story-count').val();
-
-            if (categoryId) {
-                loadBlockPosts($block, categoryId, blockIndex, dateRange, storyCount)
-                    .then(() => {
-                        setTimeout(() => {
-                            updatePreview('category_date_change');
-                            globalUpdateInProgress = false;
-                        }, 250);
-                    });
-            }
-        });
-
-        // Block type change handler
-        block.find('.block-type').off('change').on('change', function() {
-            if (globalUpdateInProgress) return;
-            
-            var newBlockType = $(this).val();
-            handleBlockTypeChange(block, newBlockType);
-            
-            globalUpdateInProgress = true;
-            setTimeout(() => {
-                updatePreview('block_type_change');
-                globalUpdateInProgress = false;
-            }, 250);
-        });
-
-        // HTML block content change handler
-        block.find('.html-block textarea').off('input').on('input', function() {
-            if (globalUpdateInProgress) return;
-            
-            globalUpdateInProgress = true;
-            setTimeout(() => {
-                updatePreview('html_content_change');
-                globalUpdateInProgress = false;
-            }, 250);
-        });
-
-        // Initial block type setup
-        var blockType = block.find('.block-type').val();
-        handleBlockTypeChange(block, blockType);
-
-        // Initial category load if needed
-        const initialCategory = block.find('.block-category').val();
-        if (initialCategory && !block.data('posts-loaded')) {
-            const dateRange = block.find('.block-date-range').val();
-            const blockIndex = block.data('index');
-            const storyCount = block.find('.block-story-count').val();
-            block.data('posts-loaded', true);
-            loadBlockPosts(block, initialCategory, blockIndex, dateRange, storyCount);
-        }
-    };
+    }
 
     // Load block posts via AJAX
     window.loadBlockPosts = function(block, categoryId, currentIndex, dateRange, storyCount) {
         // Get current selections for this block
         var savedSelections = {};
         var manualOverride = block.find('input[name*="[manual_override]"]').prop('checked');
+        
+        // Get the story count value, prioritizing in this order:
+        // 1. Provided story count parameter
+        // 2. Initial story count from data attribute
+        // 3. Current value in the dropdown
+        var currentStoryCount = storyCount || block.data('initial-story-count') || block.find('.block-story-count').val();
+        console.log('loadBlockPosts - Story count:', { 
+            blockIndex: currentIndex, 
+            provided: storyCount, 
+            initial: block.data('initial-story-count'),
+            current: block.find('.block-story-count').val(),
+            using: currentStoryCount
+        });
+        
+        // Store this as the initial value if not already set
+        if (!block.data('initial-story-count')) {
+            block.data('initial-story-count', currentStoryCount);
+        }
         
         // Get saved selections regardless of manual override state
         block.find('input[type="checkbox"][name*="[posts]"][name*="[selected]"]').each(function() {
@@ -530,13 +586,11 @@
             category_id: categoryId,
             block_index: currentIndex,
             date_range: dateRange,
-            story_count: storyCount,
+            story_count: currentStoryCount,
             newsletter_slug: newsletterData.newsletterSlug,
             saved_selections: JSON.stringify(savedSelections),
             manual_override: manualOverride
         };
-
-        console.log('Loading posts with params:', data);
 
         return $.ajax({
             url: newsletterData.ajaxUrl,
@@ -544,19 +598,15 @@
             dataType: 'json',
             data: data,
             beforeSend: function() {
-                console.log('Starting AJAX request to load posts...');
+                // Store the story count before the request
+                block.data('pre-request-story-count', currentStoryCount);
                 block.find('.block-posts').addClass('loading');
             },
             success: function(response) {
-                console.log('AJAX response received:', response);
                 block.find('.block-posts').removeClass('loading');
                 
                 if (response.success && response.data) {
-                    console.log('Response data length:', response.data.length);
-                    
-                    // Get the target element
                     var $postsContainer = block.find('.block-posts');
-                    console.log('Posts container found:', $postsContainer.length > 0);
                     
                     try {
                         // Clear existing content
@@ -564,7 +614,6 @@
                         
                         // Create a temporary div to parse the HTML
                         var $temp = $('<div>').html(response.data);
-                        console.log('Parsed HTML elements:', $temp.children().length);
                         
                         // If in manual override mode, ensure only previously selected posts are checked
                         if (manualOverride) {
@@ -581,43 +630,26 @@
                         
                         // Append the new content
                         $postsContainer.append($temp.children());
-                        console.log('New content appended');
                         
                         // Initialize sortable and event handlers
-                        console.log('Initializing sortable and event handlers...');
                         initializeSortable(block);
+                        
+                        // Restore story count value from before the request
+                        var preRequestStoryCount = block.data('pre-request-story-count');
+                        console.log('Restoring story count:', { 
+                            blockIndex: currentIndex, 
+                            value: preRequestStoryCount,
+                            initial: block.data('initial-story-count')
+                        });
+                        block.find('.block-story-count').val(preRequestStoryCount);
                         
                         // Save the state before updating preview
                         var blocks = [];
-                        var blockData = {
-                            type: block.find('.block-type').val(),
-                            title: block.find('.block-title-input').val(),
-                            show_title: block.find('.show-title-toggle').prop('checked') ? 1 : 0,
-                            template_id: block.find('.block-template').val(),
-                            category: categoryId,
-                            date_range: dateRange,
-                            story_count: storyCount,
-                            manual_override: manualOverride ? 1 : 0,
-                            posts: {}
-                        };
-
-                        // Collect all post data
-                        block.find('.block-posts li').each(function() {
-                            var $post = $(this);
-                            var postId = $post.data('post-id');
-                            var $postCheckbox = $post.find('input[type="checkbox"][name*="[selected]"]');
-                            var $orderInput = $post.find('.post-order');
-                            var isChecked = $postCheckbox.prop('checked');
-                            
-                            blockData.posts[postId] = {
-                                selected: isChecked ? 1 : 0,
-                                order: $orderInput.val() || '9223372036854775807'
-                            };
-                        });
-
+                        var blockData = collectBlockData(block);
+                        blockData.story_count = preRequestStoryCount; // Ensure correct story count in saved data
+                        blockData.posts = collectPostData(block);
                         blocks[currentIndex] = blockData;
 
-                        // Save the state before updating preview
                         return $.ajax({
                             url: newsletterData.ajaxUrl,
                             type: 'POST',
@@ -631,7 +663,6 @@
                             if (saveResponse.success) {
                                 // Now trigger the preview update
                                 if (!globalUpdateInProgress) {
-                                    console.log('Triggering preview update after save...');
                                     updatePreview('posts_loaded');
                                 }
                             }
@@ -639,11 +670,8 @@
                         
                     } catch (error) {
                         console.error('Error updating content:', error);
-                        // Fallback direct HTML update
                         $postsContainer.html(response.data);
                     }
-                } else {
-                    console.error('AJAX response invalid:', response);
                 }
             },
             error: function(xhr, status, error) {
@@ -653,155 +681,42 @@
         });
     };
 
-    // Event handlers for blocks
-    function setupBlockEventHandlers(block) {
-        // Initialize WYSIWYG editors in this block
-        block.find('.wysiwyg-editor-content').each(function() {
-            var editorId = $(this).attr('id');
-            if (typeof wp !== 'undefined' && wp.editor && editorId) {
-                // Remove any existing editor first
-                wp.editor.remove(editorId);
-                
-                // Initialize the editor
-                wp.editor.initialize(editorId, {
-                    tinymce: {
-                        wpautop: true,
-                        plugins: 'paste,lists,link,textcolor,wordpress,wplink,hr,charmap,wptextpattern',
-                        toolbar1: 'formatselect,bold,italic,bullist,numlist,link,unlink,forecolor,hr',
-                        setup: function(editor) {
-                            editor.on('change keyup paste input', function() {
-                                console.log('WYSIWYG editor content changed');
-                                if (globalUpdateInProgress) return;
-                                
-                                editor.save();
-                                globalUpdateInProgress = true;
-                                setTimeout(() => {
-                                    updatePreview('wysiwyg_content_change');
-                                    globalUpdateInProgress = false;
-                                }, 250);
-                            });
-                        }
-                    },
-                    quicktags: true,
-                    mediaButtons: true
-                });
+    // Helper function to collect block data including WYSIWYG content
+    window.collectBlockData = function($block) {
+        // Get the initial or current story count
+        var storyCount = $block.data('initial-story-count') || $block.find('.block-story-count').val();
+        console.log('Collecting block data - Story count:', { 
+            blockIndex: $block.data('index'), 
+            initial: $block.data('initial-story-count'),
+            current: $block.find('.block-story-count').val(),
+            using: storyCount
+        });
 
-                // Handle direct textarea changes for HTML view
-                $('#' + editorId).on('change keyup paste input', function() {
-                    console.log('WYSIWYG textarea content changed');
-                    if (globalUpdateInProgress) return;
-                    
-                    globalUpdateInProgress = true;
-                    setTimeout(() => {
-                        updatePreview('wysiwyg_content_change');
-                        globalUpdateInProgress = false;
-                    }, 250);
-                });
+        var blockData = {
+            type: $block.find('.block-type').val(),
+            title: $block.find('.block-title-input').val(),
+            show_title: $block.find('.show-title-toggle').prop('checked') ? 1 : 0,
+            template_id: $block.find('.block-template').val(),
+            category: $block.find('.block-category').val(),
+            date_range: $block.find('.block-date-range').val(),
+            story_count: storyCount,
+            manual_override: $block.find('input[name*="[manual_override]"]').prop('checked') ? 1 : 0
+        };
+
+        // Add WYSIWYG content if it's a WYSIWYG block
+        if (blockData.type === 'wysiwyg') {
+            var editorId = 'wysiwyg-editor-' + $block.data('index');
+            if (typeof tinyMCE !== 'undefined' && tinyMCE.get(editorId)) {
+                blockData.wysiwyg = tinyMCE.get(editorId).getContent();
+            } else {
+                blockData.wysiwyg = $('#' + editorId).val();
             }
-        });
+        } else if (blockData.type === 'html') {
+            blockData.html = $block.find('.html-block textarea').val();
+        }
 
-        // Add checkbox change handler for posts
-        block.find('.block-posts').off('change', 'input[type="checkbox"][name*="[posts]"][name*="[selected]"]').on('change', 'input[type="checkbox"][name*="[posts]"][name*="[selected]"]', function() {
-            console.log('Checkbox changed!');
-            if (globalUpdateInProgress) {
-                console.log('Update in progress, skipping...');
-                return;
-            }
-            
-            console.log('Triggering preview update for checkbox change');
-            globalUpdateInProgress = true;
-            setTimeout(() => {
-                updatePreview('post_selection_change');
-                globalUpdateInProgress = false;
-            }, 250);
-        });
-
-        // Story count change handler
-        block.find('.block-story-count').off('change').on('change', function() {
-            if (globalUpdateInProgress) return;
-            
-            globalUpdateInProgress = true;
-            const $block = $(this).closest('.block-item');
-            console.log('[Preview Debug] Story count changed - Block:', $block.data('index'), 'New count:', $(this).val());
-            const categoryId = $block.find('.block-category').val();
-            const dateRange = $block.find('.block-date-range').val();
-            const blockIndex = $block.data('index');
-            const storyCount = $(this).val();
-
-            if (categoryId) {
-                console.log('[Preview Debug] Before loadBlockPosts - Category:', categoryId, 'Story Count:', storyCount);
-                loadBlockPosts($block, categoryId, blockIndex, dateRange, storyCount)
-                    .then(() => {
-                        console.log('[Preview Debug] After loadBlockPosts success - Selected posts:', $block.find('input[type="checkbox"]:checked').length);
-                        setTimeout(() => {
-                            console.log('[Preview Debug] Before updatePreview - Block state:', {
-                                category: $block.find('.block-category').val(),
-                                storyCount: $block.find('.block-story-count').val(),
-                                selectedPosts: $block.find('input[type="checkbox"]:checked').length
-                            });
-                            updatePreview('story_count_change');
-                            globalUpdateInProgress = false;
-                        }, 250);
-                    });
-            }
-        });
-
-        // Category and date range change handlers
-        block.find('.block-category, .block-date-range').off('change').on('change', function() {
-            if (globalUpdateInProgress) return;
-            
-            globalUpdateInProgress = true;
-            const $block = $(this).closest('.block-item');
-            const categoryId = $block.find('.block-category').val();
-            const dateRange = $block.find('.block-date-range').val();
-            const blockIndex = $block.data('index');
-            const storyCount = $block.find('.block-story-count').val();
-
-            console.log('[Preview Debug] Category/Date changed - Block state:', {
-                block: blockIndex,
-                category: categoryId,
-                dateRange: dateRange,
-                storyCount: storyCount
-            });
-
-            if (categoryId) {
-                loadBlockPosts($block, categoryId, blockIndex, dateRange, storyCount)
-                    .then(() => {
-                        console.log('[Preview Debug] After category/date loadBlockPosts - Selected:', $block.find('input[type="checkbox"]:checked').length);
-                        setTimeout(() => {
-                            console.log('[Preview Debug] Before category/date updatePreview');
-                            updatePreview('category_date_change');
-                            globalUpdateInProgress = false;
-                        }, 250);
-                    });
-            }
-        });
-
-        // WYSIWYG and HTML content change handlers
-        block.find('.html-block textarea, .wysiwyg-block textarea').on('input', function() {
-            if (globalUpdateInProgress) return;
-            
-            globalUpdateInProgress = true;
-            setTimeout(() => {
-                updatePreview('content_change');
-                globalUpdateInProgress = false;
-            }, 250);
-        });
-
-        // Block type change handler
-        block.find('.block-type').off('change').on('change', function() {
-            if (globalUpdateInProgress) return;
-            
-            var newBlockType = $(this).val();
-            handleBlockTypeChange(block, newBlockType);
-            
-            globalUpdateInProgress = true;
-            setTimeout(() => {
-                updatePreview('block_type_change');
-                globalUpdateInProgress = false;
-            }, 250);
-        });
-    }
+        return blockData;
+    };
 
     // Add a new block
     window.addBlock = function() {

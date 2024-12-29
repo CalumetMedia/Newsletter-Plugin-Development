@@ -149,46 +149,38 @@ if (!isset($block_templates['default'])) {
         </div>
 
         <!-- WYSIWYG Block -->
-        <?php if ($block['type'] === 'wysiwyg'): ?>
-<!-- WYSIWYG Block -->
-<div class="wysiwyg-block" <?php if ($block['type'] !== 'wysiwyg') echo 'style="display:none;"'; ?>>
-    <label><?php esc_html_e('WYSIWYG Content:', 'newsletter'); ?></label>
-    <?php
-    $editor_id = 'wysiwyg-editor-' . $index;
-    $wysiwyg_content = isset($block['wysiwyg']) ? wp_kses_post($block['wysiwyg']) : '';
-    
-    // Add error logging
-    error_log("Initializing WYSIWYG editor $editor_id with content: " . $wysiwyg_content);
-    
-    wp_editor(
-        $wysiwyg_content,
-        $editor_id,
-        array(
-            'textarea_name' => 'blocks[' . esc_attr($index) . '][wysiwyg]',
-            'media_buttons' => true,
-            'textarea_rows' => 15,
-            'editor_class' => 'wysiwyg-editor-content',
-            'tinymce' => array(
-                'init_instance_callback' => "function(editor) {
-                    editor.on('change', function(e) {
-                        editor.save();
-                        jQuery(editor.getElement()).trigger('change');
-                    });
-                }",
-                'setup' => "function(editor) {
-                    editor.on('change', function() {
-                        editor.save();
-                    });
-                }"
-            ),
-            'quicktags' => true
-        )
-    );
-    ?>
-</div>
-        <?php else: ?>
-            <div class="wysiwyg-block" style="display:none;"></div>
-        <?php endif; ?>
+        <div class="wysiwyg-block" <?php if ($block['type'] !== 'wysiwyg') echo 'style="display:none;"'; ?>>
+            <label><?php esc_html_e('WYSIWYG Content:', 'newsletter'); ?></label>
+            <?php
+            $editor_id = 'wysiwyg-editor-' . $index;
+            $wysiwyg_content = isset($block['wysiwyg']) ? wp_kses_post($block['wysiwyg']) : '';
+            
+            wp_editor(
+                $wysiwyg_content,
+                $editor_id,
+                array(
+                    'textarea_name' => 'blocks[' . esc_attr($index) . '][wysiwyg]',
+                    'media_buttons' => true,
+                    'textarea_rows' => 15,
+                    'editor_class' => 'wysiwyg-editor-content',
+                    'tinymce' => array(
+                        'init_instance_callback' => "function(editor) {
+                            editor.on('change', function(e) {
+                                editor.save();
+                                jQuery(editor.getElement()).trigger('change');
+                            });
+                        }",
+                        'setup' => "function(editor) {
+                            editor.on('change', function() {
+                                editor.save();
+                            });
+                        }"
+                    ),
+                    'quicktags' => true
+                )
+            );
+            ?>
+        </div>
 
         <!-- Content Block Section -->
         <div class="content-block" <?php if ($block['type'] !== 'content') echo 'style="display:none;"'; ?>>

@@ -193,8 +193,9 @@ wp_localize_script('newsletter-admin-js', 'newsletterData', [
     <h1><?php echo esc_html(sprintf(__('Newsletter Generator for %s', 'newsletter'), $newsletter_name)); ?></h1>
     <div class="flex-container">
         <div class="left-column">
-            <!-- Use admin-post.php for form submission -->
+            <!-- Form supports both AJAX and regular submission -->
             <form method="post" id="blocks-form" enctype="multipart/form-data" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                <?php wp_nonce_field('save_blocks_action', 'security'); ?>
                 <?php wp_nonce_field('save_blocks_action', 'blocks_nonce'); ?>
                 <input type="hidden" name="action" value="newsletter_stories_form_submission">
                 <input type="hidden" name="newsletter_slug" value="<?php echo esc_attr($newsletter_slug); ?>">

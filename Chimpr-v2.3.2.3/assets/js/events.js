@@ -95,11 +95,16 @@ $(document).off('click', '#send-test').on('click', '#send-test', function() {
     sendTestEmail(testEmail);
 });
 
-// Save Blocks - allow normal form submission to trigger the redirect
+// Save Blocks - handle both AJAX saves and form submissions
 $(document).off('click', '#save-blocks').on('click', '#save-blocks', function(e) {
     console.log('Save button clicked');
-    e.preventDefault();
-    saveBlocks();
+    
+    // If it's a regular save (not PDF generation)
+    if (!$('button[name="generate_pdf"]').is(':focus')) {
+        e.preventDefault();
+        saveBlocks();
+    }
+    // If it's PDF generation, let the form submit normally
 });
 
 // Tab switching

@@ -60,17 +60,40 @@ function newsletter_handle_blocks_form_submission() {
                 // Process post data
                 if (isset($block['posts']) && is_array($block['posts'])) {
                     foreach ($block['posts'] as $post_id => $post_data) {
-                        // Only store checked posts
-                        if (isset($post_data['checked']) && $post_data['checked'] == '1') {
-                            // Get order value
-                            $order = isset($post_data['order']) ? intval($post_data['order']) : PHP_INT_MAX;
-
-                            // Store only checked posts with their order
-                            $sanitized_block['posts'][$post_id] = [
-                                'checked' => '1',
-                                'order' => $order
-                            ];
+                        // Ensure post_id is valid
+                        $post_id = sanitize_text_field($post_id);
+                        
+                        // Get selection state (handle both selected and checked flags)
+                        $is_selected = false;
+                        if (isset($post_data['selected'])) {
+                            $is_selected = $post_data['selected'] == 1 || $post_data['selected'] === true;
+                        } elseif (isset($post_data['checked'])) {
+                            $is_selected = $post_data['checked'] == '1' || $post_data['checked'] === true;
                         }
+                        
+                        // Get order value
+                        $order = isset($post_data['order']) ? intval($post_data['order']) : PHP_INT_MAX;
+                        
+                        // Store post data
+                        $sanitized_block['posts'][$post_id] = [
+                            'selected' => $is_selected ? 1 : 0,
+                            'order' => $order
+                        ];
+                    }
+                }
+                
+                // If we're in auto-selection mode (not manual override), select top N posts
+                if (!$sanitized_block['manual_override'] && $sanitized_block['story_count'] !== 'disable') {
+                    $story_count = intval($sanitized_block['story_count']);
+                    $posts_by_order = $sanitized_block['posts'];
+                    uasort($posts_by_order, function($a, $b) {
+                        return $a['order'] - $b['order'];
+                    });
+                    
+                    $count = 0;
+                    foreach ($posts_by_order as $post_id => $post_data) {
+                        $sanitized_block['posts'][$post_id]['selected'] = ($count < $story_count) ? 1 : 0;
+                        $count++;
                     }
                 }
             } elseif ($block['type'] === 'wysiwyg' || (isset($existing_blocks[$index]['type']) && $existing_blocks[$index]['type'] === 'wysiwyg')) {

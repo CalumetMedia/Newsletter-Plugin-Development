@@ -222,3 +222,43 @@
         margin-right: 0;
     }
 }
+
+#preview-container {
+    min-height: 200px;
+    padding: 20px;
+    background: #fff;
+    border: 1px solid #ddd;
+    margin: 10px 0;
+    overflow: auto;
+    position: relative;
+}
+
+#preview-container:empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+}
+
+#preview-container:empty::before {
+    content: 'Loading preview...';
+    color: #666;
+    font-style: italic;
+}
+
+#preview-container .error {
+    color: #dc3232;
+    padding: 10px;
+    margin: 0;
+    text-align: center;
+}
+
+.newsletter-preview-container {
+    width: 100%;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.newsletter-content {
+    padding: 15px;
+}

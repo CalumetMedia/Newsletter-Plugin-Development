@@ -21,59 +21,33 @@
                 manual_override: $block.find('input[name*="[manual_override]"]').prop('checked') ? 1 : 0,
                 posts: {}
             };
-
-            // Log block data being collected
-            console.log('Block ' + index + ' data:', {
-                type: blockData.type,
-                title: blockData.title,
-                show_title: blockData.show_title,
-                template_id: blockData.template_id,
-                category: blockData.category,
-                date_range: blockData.date_range,
-                story_count: blockData.story_count,
-                manual_override: blockData.manual_override
-            });
-
+            
             // Collect post data
             $block.find('.block-posts li').each(function() {
                 var $post = $(this);
                 var postId = $post.data('post-id');
-                var $checkbox = $post.find('input[type="checkbox"][name*="[checked]"]');
+                var $checkbox = $post.find('input[type="checkbox"][name*="[selected]"]');
                 var $orderInput = $post.find('.post-order');
-                var isChecked = $checkbox.prop('checked');
                 
-                // Log post data being collected
-                console.log('Post ' + postId + ' data:', {
-                    checked: isChecked,
-                    order: $orderInput.val()
-                });
-                
-                // Only store checked posts
-                if (isChecked) {
-                    blockData.posts[postId] = {
-                        checked: '1',
-                        order: $orderInput.val() || '0'
-                    };
-                }
+                blockData.posts[postId] = {
+                    selected: $checkbox.prop('checked') ? 1 : 0,
+                    order: $orderInput.val() || '9223372036854775807'
+                };
             });
 
             // Add HTML content if it's an HTML block
             if (blockData.type === 'html') {
                 blockData.html = $block.find('.html-block textarea').val();
-                console.log('HTML content:', blockData.html);
             }
             
             // Add WYSIWYG content if it's a WYSIWYG block
             if (blockData.type === 'wysiwyg') {
                 blockData.wysiwyg = $block.find('.wysiwyg-editor-content').val();
-                console.log('WYSIWYG content:', blockData.wysiwyg);
             }
-
+            
             blocks[index] = blockData;
         });
-
-        console.log('Final blocks data:', blocks);
-
+        
         var ajaxData = {
             action: 'save_newsletter_blocks',
             security: newsletterData.nonceSaveBlocks,
@@ -81,31 +55,23 @@
             blocks: blocks
         };
 
-        console.log('AJAX request data:', ajaxData);
-
         $.ajax({
             url: newsletterData.ajaxUrl,
             method: 'POST',
             dataType: 'json',
             data: ajaxData,
             success: function(response) {
-                console.log('Save response:', response);
                 if (response.success) {
-                    updatePreview();
+                    window.updatePreview('after_save');
                     alert(newsletterData.blocksSavedMessage || 'Blocks have been saved successfully.');
                 } else {
-                    console.error('Save failed. Response:', response);
+                    console.error('Save failed:', response);
                     var errorMessage = 'An error occurred while saving blocks.';
                     if (response.data) {
-                        console.error('Error data:', response.data);
                         if (typeof response.data === 'string') {
                             errorMessage = response.data;
                         } else if (response.data.message) {
                             errorMessage = response.data.message;
-                            if (response.data.debug_info) {
-                                console.error('Debug info:', response.data.debug_info);
-                                errorMessage += '\n\nDebug info:\n' + JSON.stringify(response.data.debug_info, null, 2);
-                            }
                         } else if (response.data.error) {
                             errorMessage = response.data.error;
                         }
@@ -114,13 +80,7 @@
                 }
             },
             error: function(xhr, status, error) {
-                console.error('AJAX Error:', {
-                    status: status,
-                    error: error,
-                    responseText: xhr.responseText,
-                    statusCode: xhr.status
-                });
-                
+                console.error('AJAX Error:', error);
                 var errorMessage = 'Error saving blocks';
                 try {
                     var responseData = JSON.parse(xhr.responseText);
@@ -129,10 +89,6 @@
                             errorMessage += ': ' + responseData.data;
                         } else if (responseData.data.message) {
                             errorMessage += ': ' + responseData.data.message;
-                            if (responseData.data.debug_info) {
-                                console.error('Debug info:', responseData.data.debug_info);
-                                errorMessage += '\n\nDebug info:\n' + JSON.stringify(responseData.data.debug_info, null, 2);
-                            }
                         } else {
                             errorMessage += ': ' + JSON.stringify(responseData.data);
                         }

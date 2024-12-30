@@ -19,9 +19,6 @@
             initDatepickers();
         }
 
-        // Track preview initialization
-        let previewInitialized = false;
-
         // Initialize existing blocks with a slight delay to ensure everything is ready
         setTimeout(function() {
             let initializationPromises = [];
@@ -36,13 +33,10 @@
                 }
             });
 
-            // Wait for all blocks to initialize before initial preview
+            // Wait for all blocks to initialize
             Promise.all(initializationPromises).then(() => {
-                // Only update preview if no blocks have been loaded yet
-                if (!previewInitialized && typeof updatePreview === 'function' && !$('.block-item[data-posts-loaded]').length) {
-                    previewInitialized = true;
-                    updatePreview();
-                }
+                // Block initialization complete
+                // Preview will be handled by block-manager.js
             });
         }, 100);
 

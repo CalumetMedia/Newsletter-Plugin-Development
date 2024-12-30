@@ -121,5 +121,14 @@ $newsletter_slug = get_valid_newsletter_slug();
 $blocks = get_newsletter_blocks_by_slug($newsletter_slug);
 $preview_html = newsletter_generate_preview_content($newsletter_slug, $blocks);
 
+// Ensure we have a preview container
+echo '<div id="preview-container">';
+
 // Output the generated preview
-echo !empty($preview_html) ? $preview_html : '<p class="error">' . esc_html__('Unable to generate preview content.', 'newsletter') . '</p>';
+if (!empty($preview_html)) {
+    echo $preview_html;
+} else {
+    echo '<p class="error">' . esc_html__('Unable to generate preview content.', 'newsletter') . '</p>';
+}
+
+echo '</div>';

@@ -83,146 +83,61 @@
 
     function collectPostStates() {
         const state = {};
+        let hasValidState = false;
+
         $('.block-item').each(function() {
             const blockIndex = $(this).data('index');
-            state[blockIndex] = state[blockIndex] || {};
+            state[blockIndex] = {};
             
-            $(this).find('.sortable-post-item').each(function() {
+            const storyCount = $(this).find('.block-story-count').val();
+            const manualOverride = $(this).find('.manual-override-toggle').prop('checked');
+            
+            // Get all posts for this block
+            const $posts = $(this).find('.block-posts li');
+            $posts.each(function(index) {
                 const postId = $(this).data('post-id');
+                if (!postId) return;
+
                 const $checkbox = $(this).find('input[type="checkbox"][name*="[checked]"]');
                 const $orderInput = $(this).find('.post-order');
                 
-                // Only store checked posts
-                if ($checkbox.prop('checked')) {
-                    state[blockIndex][postId] = {
-                        checked: '1',
-                        order: $orderInput.val() || '0'
-                    };
-                }
-            });
-        });
-        return state;
-    }
-
-    function generatePreview(trigger) {
-        if (globalUpdateInProgress) {
-            console.log('[Preview] Update still in progress, skipping');
-            return Promise.resolve();
-        }
-
-        console.log('[Preview] Starting preview generation');
-        globalUpdateInProgress = true;
-
-        try {
-            // Collect current state
-            const postStates = collectPostStates();
-            
-            // Log the state for debugging
-            Object.entries(postStates).forEach(([blockIndex, posts]) => {
-                Object.entries(posts).forEach(([postId, state]) => {
-                    console.log('[Preview] Post state:', {
-                        blockIndex,
-                        postId,
-                        isChecked: state.checked === '1',
-                        order: state.order
-                    });
-                });
-            });
-
-            console.log('[Preview] Collected state:', postStates);
-
-            // Get all blocks data
-            const blocks = [];
-            $('.block-item').each(function() {
-                const blockIndex = $(this).data('index');
-                const blockData = {
-                    type: $(this).find('.block-type').val(),
-                    title: $(this).find('.block-title').val(),
-                    show_title: $(this).find('.show-title-toggle').prop('checked') ? 1 : 0,
-                    template_id: $(this).find('.block-template').val(),
-                    category: $(this).find('.block-category').val(),
-                    date_range: $(this).find('.block-date-range').val(),
-                    story_count: $(this).find('.block-story-count').val(),
-                    manual_override: $(this).find('.manual-override-toggle').prop('checked') ? 1 : 0,
-                    posts: {}
+                // Post is selected if:
+                // 1. Manual override is on and checkbox is checked, OR
+                // 2. Manual override is off and index is less than story count (auto-selection)
+                const isSelected = manualOverride ? 
+                    $checkbox.prop('checked') : 
+                    (storyCount !== 'disable' && index < parseInt(storyCount));
+                
+                state[blockIndex][postId] = {
+                    checked: isSelected ? '1' : '',
+                    order: $orderInput.val() || '0'
                 };
 
-                // Add post states
-                if (postStates[blockIndex]) {
-                    blockData.posts = postStates[blockIndex];
-                }
-
-                if (blockData.type === 'html') {
-                    blockData.html = $(this).find('.html-block textarea').val();
-                } else if (blockData.type === 'wysiwyg') {
-                    blockData.wysiwyg = $(this).find('.wysiwyg-editor-content').val();
-                }
-
-                blocks[blockIndex] = blockData;
+                if (isSelected) hasValidState = true;
             });
-
-            var formData = $('#blocks-form').serializeArray();
-            formData.push({ name: 'action', value: 'generate_preview' });
-            formData.push({ name: 'newsletter_slug', value: newsletterData.newsletterSlug });
-            formData.push({ name: 'security', value: newsletterData.nonceGeneratePreview });
-            formData.push({ name: 'saved_selections', value: JSON.stringify(postStates) });
-
-            // Create and store the promise
-            previewUpdatePromise = new Promise((resolve, reject) => {
-                $.ajax({
-                    url: newsletterData.ajaxUrl,
-                    method: 'POST',
-                    dataType: 'json',
-                    data: formData
-                })
-                .done(response => {
-                    console.log('[Preview] Server response:', response);
-                    if (!response.success) {
-                        reject(new Error(response.data || 'Preview generation failed'));
-                        return;
-                    }
-                    $('#preview-content').html(response.data);
-                    console.log('[Preview] Preview updated successfully');
-                    resolve(response);
-                })
-                .fail(error => {
-                    console.error('[Preview] Error updating preview:', error);
-                    reject(error);
-                })
-                .always(() => {
-                    // Remove this request from tracking
-                    const index = activeRequests.indexOf(previewUpdatePromise);
-                    if (index > -1) {
-                        activeRequests.splice(index, 1);
-                    }
-                    resetPreviewState();
-                });
-            });
-
-            // Track this request
-            activeRequests.push(previewUpdatePromise);
-
-            return previewUpdatePromise;
-
-        } catch (error) {
-            console.error('[Preview] Error in preview generation:', error);
-            resetPreviewState();
-            return Promise.reject(error);
-        }
+            
+            // Keep the block state even if empty to maintain block structure
+            if (Object.keys(state[blockIndex]).length === 0) {
+                state[blockIndex] = {};
+            }
+        });
+        
+        // Return state if we have any blocks, even without selections
+        // This allows preview generation for empty/new blocks
+        return Object.keys(state).length > 0 ? state : null;
     }
 
     // Simplified updatePreview function with debounce
     let previewTimeout = null;
     let lastUpdateSource = null;
     window.updatePreview = function(source) {
-        // Skip undefined source if we've already had a real update
-        if (!source && lastUpdateSource) {
-            console.log('[Preview] Skipping undefined source update after', lastUpdateSource);
-            return;
+        if (!source) {
+            console.warn('[Preview] Update called without source, using default');
+            source = 'default';
         }
         
         console.log('[Preview] Update requested from:', source);
-        lastUpdateSource = source || 'initial';
+        lastUpdateSource = source;
         
         // Clear any existing timeout
         if (previewTimeout) {
@@ -231,14 +146,14 @@
         }
         
         // If an update is in progress, wait a bit longer
-        const delay = globalUpdateInProgress ? 500 : 250;
+        const delay = window.isPreviewUpdateInProgress() ? 500 : 250;
         
         // Set a new timeout
         previewTimeout = setTimeout(function() {
             previewTimeout = null;  // Clear the reference
             // Double check the flag when timeout executes
-            if (!globalUpdateInProgress) {
-                generatePreview();
+            if (!window.isPreviewUpdateInProgress()) {
+                window.generatePreview(source);
             } else {
                 console.log('[Preview] Update still in progress, skipping');
             }
@@ -302,6 +217,106 @@
     // Expose a function to set the global update flag
     window.setPreviewUpdateInProgress = function(value) {
         globalUpdateInProgress = value;
+    };
+
+    // Expose the preview generation function globally
+    window.generatePreview = function(trigger) {
+        if (!trigger) trigger = 'default';
+        
+        if (window.isPreviewUpdateInProgress()) {
+            return Promise.resolve();
+        }
+        
+        window.setPreviewUpdateInProgress(true);
+
+        try {
+            // Collect current state
+            const postStates = collectPostStates();
+            
+            if (!postStates) {
+                $('#preview-container').html('<p>No content available for preview. Please select a category and posts to preview.</p>');
+                window.setPreviewUpdateInProgress(false);
+                return Promise.resolve();
+            }
+
+            // Get all blocks data
+            const blocks = [];
+            $('.block-item').each(function() {
+                const blockIndex = $(this).data('index');
+                const blockData = {
+                    type: $(this).find('.block-type').val(),
+                    title: $(this).find('.block-title-input').val(),
+                    show_title: $(this).find('.show-title-toggle').prop('checked') ? 1 : 0,
+                    template_id: $(this).find('.block-template').val(),
+                    category: $(this).find('.block-category').val(),
+                    date_range: $(this).find('.block-date-range').val(),
+                    story_count: $(this).find('.block-story-count').val(),
+                    manual_override: $(this).find('.manual-override-toggle').prop('checked') ? 1 : 0,
+                    posts: postStates[blockIndex] || {}
+                };
+
+                if (blockData.type === 'html') {
+                    blockData.html = $(this).find('.html-block textarea').val();
+                } else if (blockData.type === 'wysiwyg') {
+                    blockData.wysiwyg = $(this).find('.wysiwyg-editor-content').val();
+                }
+
+                blocks[blockIndex] = blockData;
+            });
+
+            const data = {
+                action: 'generate_preview',
+                newsletter_slug: newsletterData.newsletterSlug,
+                security: newsletterData.nonceGeneratePreview,
+                saved_selections: JSON.stringify(postStates),
+                blocks: JSON.stringify(blocks),
+                custom_header: $('#custom_header').val() || '',
+                custom_footer: $('#custom_footer').val() || '',
+                subject_line: $('#subject_line').val() || '',
+                campaign_name: $('#campaign_name').val() || '',
+                start_date: $('#start_date').val() || '',
+                end_date: $('#end_date').val() || ''
+            };
+
+            return $.ajax({
+                url: newsletterData.ajaxUrl,
+                method: 'POST',
+                data: data,
+                dataType: 'json'
+            })
+            .done(response => {
+                if (!response.success) {
+                    $('#preview-container').html('<p>Error generating preview</p>');
+                    return;
+                }
+                
+                if (!response.data || response.data.includes('No content available for preview')) {
+                    $('#preview-container').html('<p>No content available for preview. Please ensure posts are selected and try again.</p>');
+                    return;
+                }
+                
+                try {
+                    const cleanedData = response.data.replace(/\\r\\n/g, '\n').replace(/\\"/g, '"');
+                    let $container = $('#preview-container');
+                    if (!$container.length) {
+                        $container = $('<div id="preview-container"></div>').appendTo('#preview-tab');
+                    }
+                    $container.empty().html(cleanedData);
+                } catch (error) {
+                    $('#preview-container').html('<p>Error displaying preview content</p>');
+                }
+            })
+            .fail(() => {
+                $('#preview-container').html('<p>Failed to generate preview</p>');
+            })
+            .always(() => {
+                window.setPreviewUpdateInProgress(false);
+            });
+
+        } catch (error) {
+            window.setPreviewUpdateInProgress(false);
+            return Promise.reject(error);
+        }
     };
 
 })(jQuery);

@@ -76,18 +76,38 @@ function newsletter_generate_preview() {
             $saved_selections = $decoded;
         }
 
+        // Get and validate blocks data
+        $blocks_data = [];
+        if (isset($_POST['blocks'])) {
+            $decoded_blocks = json_decode(stripslashes($_POST['blocks']), true);
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                error_log('Preview generation - Blocks JSON decode error: ' . json_last_error_msg());
+                wp_send_json_error('Invalid blocks format');
+                return;
+            }
+            if (!is_array($decoded_blocks)) {
+                error_log('Preview generation - Invalid blocks structure');
+                wp_send_json_error('Invalid blocks structure');
+                return;
+            }
+            $blocks_data = $decoded_blocks;
+        }
+
         error_log('Saved selections: ' . print_r($saved_selections, true));
+        error_log('Blocks data: ' . print_r($blocks_data, true));
 
         // Merge saved selections into blocks with validation
-        foreach ($saved_selections as $block_index => $block_data) {
+        foreach ($blocks_data as $block_index => $block_data) {
             if (!isset($saved_blocks[$block_index])) {
                 continue; // Skip if block doesn't exist
             }
             
             // Handle WYSIWYG content
-            if (isset($saved_blocks[$block_index]['type']) && $saved_blocks[$block_index]['type'] === 'wysiwyg') {
+            if (isset($block_data['type']) && $block_data['type'] === 'wysiwyg') {
                 if (isset($block_data['wysiwyg'])) {
+                    error_log('Setting WYSIWYG content for block ' . $block_index);
                     $saved_blocks[$block_index]['wysiwyg'] = wp_kses_post(wp_unslash($block_data['wysiwyg']));
+                    error_log('WYSIWYG content set: ' . $saved_blocks[$block_index]['wysiwyg']);
                 } else {
                     // Preserve empty WYSIWYG blocks
                     $saved_blocks[$block_index]['wysiwyg'] = '';

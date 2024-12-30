@@ -208,8 +208,8 @@ $(document).off('click', '#schedule-campaign').on('click', '#schedule-campaign',
 // Reinitialize sortable after AJAX content updates
 $(document).ajaxComplete(function(event, xhr, settings) {
     if (settings.url === newsletterData.ajaxUrl && 
-        settings.data && 
-        settings.data.indexOf('action=load_block_posts') !== -1) {
+        ((settings.data && typeof settings.data === 'string' && settings.data.indexOf('action=load_block_posts') !== -1) ||
+         (settings.data instanceof FormData && settings.data.get('action') === 'load_block_posts'))) {
         
         var $block = $('.block-item').filter(function() {
             return $(this).find('.block-posts.loading').length > 0;

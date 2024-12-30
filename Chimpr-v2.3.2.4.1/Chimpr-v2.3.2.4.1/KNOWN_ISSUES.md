@@ -1,5 +1,10 @@
 # Known Issues and Solutions
 
+## WYSIWYG Preview Not Displaying (2024-12-30)
+**Issue**: WYSIWYG editor content was not displaying in the preview panel after editing.
+**Solution**: Updated preview generation and AJAX handling to properly collect, transmit, and render WYSIWYG content.
+**Details**: See `/knowledge-base/2024/12/wysiwyg-preview-issue-20241230-1513.md`
+
 ## WYSIWYG Content Lost During Drag and Drop (2024-12-30)
 **Issue**: WYSIWYG editor content was being lost when blocks were reordered using drag and drop.
 **Solution**: Updated block reordering logic to properly preserve and reinitialize WYSIWYG editors.

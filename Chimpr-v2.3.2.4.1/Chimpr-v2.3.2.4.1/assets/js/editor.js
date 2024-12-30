@@ -22,18 +22,25 @@
                         setup: function(editor) {
                             // Initialize editor content
                             editor.on('init', function() {
+                                console.log('Editor initialized:', editorId);
                                 var content = editor.getContent();
                                 content = content.replace(/\\'/g, "'").replace(/\\"/g, '"');
                                 if (content && content.indexOf('<p>') === -1) {
                                     content = switchEditors.wpautop(content);
                                 }
                                 editor.setContent(content);
-                                updatePreview();
+                                console.log('Initial content set:', content);
+                                updatePreview('editor_init');
                             });
 
                             // Handle content changes
                             editor.on('change keyup NodeChange SetContent', function() {
-                                editor.save();
+                                console.log('Editor content changed:', editorId);
+                                editor.save(); // Save content to textarea
+                                var content = editor.getContent();
+                                console.log('New content:', content);
+                                // Update the textarea
+                                $('#' + editorId).val(content).trigger('change');
                                 updatePreview('editor_content_change');
                             });
 
@@ -41,7 +48,11 @@
                             editor.on('keyup', function() {
                                 clearTimeout(editor.updateTimer);
                                 editor.updateTimer = setTimeout(function() {
+                                    console.log('Editor keyup:', editorId);
                                     editor.save();
+                                    var content = editor.getContent();
+                                    console.log('Keyup content:', content);
+                                    $('#' + editorId).val(content).trigger('change');
                                     updatePreview('editor_keyup');
                                 }, 300);
                             });
@@ -49,7 +60,11 @@
                             // Handle paste events
                             editor.on('paste', function(e) {
                                 setTimeout(function() {
+                                    console.log('Editor paste:', editorId);
                                     editor.save();
+                                    var content = editor.getContent();
+                                    console.log('Paste content:', content);
+                                    $('#' + editorId).val(content).trigger('change');
                                     updatePreview('editor_paste');
                                 }, 100);
                             });

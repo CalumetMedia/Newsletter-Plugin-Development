@@ -64,6 +64,8 @@ function get_newsletter_blocks_by_slug($slug) {
         update_option($blocks_option, $blocks);
     }
 
+    error_log("Retrieved blocks for slug '$slug': " . print_r($blocks, true));
+
     // Process each content block to maintain selected posts
     foreach ($blocks as &$block) {
         if ($block['type'] === 'content') {
@@ -109,6 +111,13 @@ function get_newsletter_blocks_by_slug($slug) {
                     }
                 }
             }
+        } elseif ($block['type'] === 'wysiwyg') {
+            error_log("Processing WYSIWYG block: " . print_r($block, true));
+            // Ensure WYSIWYG content is properly sanitized but preserves HTML
+            if (isset($block['wysiwyg'])) {
+                $block['wysiwyg'] = wp_kses_post(wp_unslash($block['wysiwyg']));
+                error_log("Sanitized WYSIWYG content: " . $block['wysiwyg']);
+            }
         }
     }
     unset($block);
@@ -119,7 +128,13 @@ function get_newsletter_blocks_by_slug($slug) {
 // Main logic
 $newsletter_slug = get_valid_newsletter_slug();
 $blocks = get_newsletter_blocks_by_slug($newsletter_slug);
+error_log("Generating preview for blocks: " . print_r($blocks, true));
 $preview_html = newsletter_generate_preview_content($newsletter_slug, $blocks);
 
 // Output the generated preview
-echo !empty($preview_html) ? $preview_html : '<p class="error">' . esc_html__('Unable to generate preview content.', 'newsletter') . '</p>';
+if (!empty($preview_html)) {
+    echo $preview_html;
+} else {
+    error_log("Preview generation failed - empty preview HTML");
+    echo '<p class="error">' . esc_html__('Unable to generate preview content.', 'newsletter') . '</p>';
+}

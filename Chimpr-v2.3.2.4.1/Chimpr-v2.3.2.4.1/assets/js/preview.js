@@ -137,7 +137,7 @@
                 const blockIndex = $(this).data('index');
                 const blockData = {
                     type: $(this).find('.block-type').val(),
-                    title: $(this).find('.block-title').val(),
+                    title: $(this).find('.block-title-input').val(),
                     show_title: $(this).find('.show-title-toggle').prop('checked') ? 1 : 0,
                     template_id: $(this).find('.block-template').val(),
                     category: $(this).find('.block-category').val(),
@@ -156,53 +156,57 @@
                     blockData.html = $(this).find('.html-block textarea').val();
                 } else if (blockData.type === 'wysiwyg') {
                     // Get content from TinyMCE if available
-                    const editorId = $(this).find('.wysiwyg-editor').attr('id');
+                    const editorId = $(this).find('.wysiwyg-editor-content').attr('id');
                     if (window.tinyMCE && window.tinyMCE.get(editorId)) {
+                        console.log('[Preview] Getting WYSIWYG content from editor:', editorId);
                         blockData.wysiwyg = window.tinyMCE.get(editorId).getContent();
+                        console.log('[Preview] WYSIWYG content:', blockData.wysiwyg);
                     } else {
-                        blockData.wysiwyg = $(this).find('.wysiwyg-editor').val();
+                        console.log('[Preview] Getting WYSIWYG content from textarea');
+                        blockData.wysiwyg = $(this).find('.wysiwyg-editor-content').val();
                     }
                 }
 
                 blocks[blockIndex] = blockData;
             });
 
-            var formData = $('#blocks-form').serializeArray();
-            formData.push({ name: 'action', value: 'generate_preview' });
-            formData.push({ name: 'newsletter_slug', value: newsletterData.newsletterSlug });
-            formData.push({ name: 'security', value: newsletterData.nonceGeneratePreview });
-            formData.push({ name: 'saved_selections', value: JSON.stringify(postStates) });
-            formData.push({ name: 'blocks', value: JSON.stringify(blocks) });
+            var formData = new FormData();
+            formData.append('action', 'generate_preview');
+            formData.append('newsletter_slug', newsletterData.newsletterSlug);
+            formData.append('security', newsletterData.nonceGeneratePreview);
+            formData.append('saved_selections', JSON.stringify(postStates));
+            formData.append('blocks', JSON.stringify(blocks));
 
             // Create and store the promise
             previewUpdatePromise = new Promise((resolve, reject) => {
                 $.ajax({
                     url: newsletterData.ajaxUrl,
                     method: 'POST',
-                    dataType: 'json',
-                    data: formData
-                })
-                .done(response => {
-                    console.log('[Preview] Server response:', response);
-                    if (!response.success) {
-                        reject(new Error(response.data || 'Preview generation failed'));
-                        return;
+                    processData: false,
+                    contentType: false,
+                    data: formData,
+                    success: function(response) {
+                        console.log('[Preview] Server response:', response);
+                        if (!response.success) {
+                            reject(new Error(response.data || 'Preview generation failed'));
+                            return;
+                        }
+                        $('#preview-content').html(response.data);
+                        console.log('[Preview] Preview updated successfully');
+                        resolve(response);
+                    },
+                    error: function(error) {
+                        console.error('[Preview] Error updating preview:', error);
+                        reject(error);
+                    },
+                    complete: function() {
+                        // Remove this request from tracking
+                        const index = activeRequests.indexOf(previewUpdatePromise);
+                        if (index > -1) {
+                            activeRequests.splice(index, 1);
+                        }
+                        resetPreviewState();
                     }
-                    $('#preview-content').html(response.data);
-                    console.log('[Preview] Preview updated successfully');
-                    resolve(response);
-                })
-                .fail(error => {
-                    console.error('[Preview] Error updating preview:', error);
-                    reject(error);
-                })
-                .always(() => {
-                    // Remove this request from tracking
-                    const index = activeRequests.indexOf(previewUpdatePromise);
-                    if (index > -1) {
-                        activeRequests.splice(index, 1);
-                    }
-                    resetPreviewState();
                 });
             });
 

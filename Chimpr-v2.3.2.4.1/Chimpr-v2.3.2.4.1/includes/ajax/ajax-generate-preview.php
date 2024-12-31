@@ -63,26 +63,44 @@ function newsletter_generate_preview() {
         // Merge saved selections into blocks
         foreach ($saved_selections as $block_index => $block_data) {
             if (!isset($saved_blocks[$block_index])) {
-                continue;
+                $saved_blocks[$block_index] = [];
             }
             
-            if (!isset($block_data['posts']) || !is_array($block_data['posts'])) {
-                continue;
+            // Handle WYSIWYG content
+            if (isset($block_data['type']) && $block_data['type'] === 'wysiwyg') {
+                $saved_blocks[$block_index]['type'] = 'wysiwyg';
+                $saved_blocks[$block_index]['wysiwyg'] = wp_kses_post($block_data['wysiwyg']);
+            }
+            
+            // Handle HTML content
+            if (isset($block_data['type']) && $block_data['type'] === 'html') {
+                $saved_blocks[$block_index]['type'] = 'html';
+                $saved_blocks[$block_index]['html'] = wp_kses_post($block_data['html']);
+            }
+            
+            // Handle other block data
+            foreach (['title', 'show_title', 'template_id', 'category', 'date_range', 'story_count', 'manual_override'] as $field) {
+                if (isset($block_data[$field])) {
+                    $saved_blocks[$block_index][$field] = $block_data[$field];
+                }
             }
 
-            $saved_blocks[$block_index]['posts'] = [];
-            foreach ($block_data['posts'] as $post_id => $post_data) {
-                if (!is_array($post_data)) {
-                    continue;
-                }
+            // Handle posts data
+            if (isset($block_data['posts']) && is_array($block_data['posts'])) {
+                $saved_blocks[$block_index]['posts'] = [];
+                foreach ($block_data['posts'] as $post_id => $post_data) {
+                    if (!is_array($post_data)) {
+                        continue;
+                    }
 
-                // Only store checked posts - handle both 'checked' and 'selected' for compatibility
-                if ((isset($post_data['checked']) && $post_data['checked'] === '1') || 
-                    (isset($post_data['selected']) && $post_data['selected'] === '1')) {
-                    $saved_blocks[$block_index]['posts'][$post_id] = [
-                        'checked' => '1',  // Always store as 'checked'
-                        'order' => isset($post_data['order']) ? intval($post_data['order']) : PHP_INT_MAX
-                    ];
+                    // Only store checked posts
+                    if ((isset($post_data['checked']) && $post_data['checked'] === '1') || 
+                        (isset($post_data['selected']) && $post_data['selected'] === '1')) {
+                        $saved_blocks[$block_index]['posts'][$post_id] = [
+                            'checked' => '1',  // Always store as 'checked'
+                            'order' => isset($post_data['order']) ? intval($post_data['order']) : PHP_INT_MAX
+                        ];
+                    }
                 }
             }
         }

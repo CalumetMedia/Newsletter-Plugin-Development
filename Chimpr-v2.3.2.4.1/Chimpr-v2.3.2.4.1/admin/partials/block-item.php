@@ -65,11 +65,12 @@ if (!isset($block_templates['default'])) {
                 </select>
             </div>
 
-            <div style="width: 200px;" class="category-select" <?php if ($block['type'] === 'html' || $block['type'] === 'wysiwyg') echo 'style="display:none;"'; ?>>
+            <div style="width: 200px;" class="category-select">
                 <label><?php esc_html_e('Select Category:', 'newsletter'); ?></label>
                 <select name="blocks[<?php echo esc_attr($index); ?>][category]" 
                         class="block-category" 
-                        style="width: 100%; height: 36px; line-height: 1.4; padding: 0 6px;">
+                        style="width: 100%; height: 36px; line-height: 1.4; padding: 0 6px;"
+                        <?php echo ($block['type'] === 'html' || $block['type'] === 'wysiwyg') ? 'disabled' : ''; ?>>
                     <option value=""><?php esc_html_e('-- Select Category --', 'newsletter'); ?></option>
                     <?php
                     if (!empty($all_categories)) {
@@ -82,28 +83,30 @@ if (!isset($block_templates['default'])) {
                 </select>
             </div>
     
-    <div style="width: 200px;" class="template-select" <?php if ($block['type'] === 'html' || $block['type'] === 'wysiwyg') echo 'style="display:none;"'; ?>>
-        <label><?php esc_html_e('Template:', 'newsletter'); ?></label>
-        <select name="blocks[<?php echo esc_attr($index); ?>][template_id]" 
-                class="block-template" 
-                style="width: 100%; height: 36px; line-height: 1.4; padding: 0 6px;">
-            <?php
-            foreach ($block_templates as $tid => $template) {
-                $selected = (isset($block['template_id']) && $block['template_id'] == $tid) ? 'selected' : '';
-                echo '<option value="' . esc_attr($tid) . '" ' . $selected . '>' . esc_html($template['name']) . '</option>';
-            }
-            ?>
-        </select>
-    </div>
+            <div style="width: 200px;" class="template-select">
+                <label><?php esc_html_e('Template:', 'newsletter'); ?></label>
+                <select name="blocks[<?php echo esc_attr($index); ?>][template_id]" 
+                        class="block-template" 
+                        style="width: 100%; height: 36px; line-height: 1.4; padding: 0 6px;"
+                        <?php echo ($block['type'] === 'html' || $block['type'] === 'wysiwyg') ? 'disabled' : ''; ?>>
+                    <?php
+                    foreach ($block_templates as $tid => $template) {
+                        $selected = (isset($block['template_id']) && $block['template_id'] == $tid) ? 'selected' : '';
+                        echo '<option value="' . esc_attr($tid) . '" ' . $selected . '>' . esc_html($template['name']) . '</option>';
+                    }
+                    ?>
+                </select>
+            </div>
         </div>
 
         <!-- Date Range and Story Count Row -->
-        <div class="date-range-row" style="display: flex; gap: 15px; margin-bottom: 10px;" <?php if ($block['type'] === 'html' || $block['type'] === 'wysiwyg') echo 'style="display:none;"'; ?>>
+        <div class="date-range-row" style="display: flex; gap: 15px; margin-bottom: 10px;">
             <div>
                 <label><?php esc_html_e('Date Range:', 'newsletter'); ?></label>
                 <select name="blocks[<?php echo esc_attr($index); ?>][date_range]" 
                         class="block-date-range" 
-                        style="width: 200px; height: 36px; line-height: 1.4; padding: 0 6px;">
+                        style="width: 200px; height: 36px; line-height: 1.4; padding: 0 6px;"
+                        <?php echo ($block['type'] === 'html' || $block['type'] === 'wysiwyg') ? 'disabled' : ''; ?>>
                     <option value="1" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 1); ?>><?php esc_html_e('Previous 1 Day', 'newsletter'); ?></option>
                     <option value="2" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 2); ?>><?php esc_html_e('Previous 2 Days', 'newsletter'); ?></option>
                     <option value="3" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 3); ?>><?php esc_html_e('Previous 3 Days', 'newsletter'); ?></option>
@@ -122,7 +125,9 @@ if (!isset($block_templates['default'])) {
                 <label><?php esc_html_e('Number of Stories:', 'newsletter'); ?></label>
                 <select name="blocks[<?php echo esc_attr($index); ?>][story_count]" 
                         class="block-story-count" 
-                        style="width: 200px; height: 36px; line-height: 1.4; padding: 0 6px;">
+                        style="width: 200px; height: 36px; line-height: 1.4; padding: 0 6px;"
+                        data-block-index="<?php echo esc_attr($index); ?>"
+                        <?php echo ($block['type'] === 'html' || $block['type'] === 'wysiwyg') ? 'disabled' : ''; ?>>
                     <option value="disable" <?php selected($current_story_count, 'disable'); ?>><?php esc_html_e('All', 'newsletter'); ?></option>
                     <?php for ($i = 1; $i <= 10; $i++) : ?>
                         <option value="<?php echo $i; ?>" <?php selected($current_story_count, $i); ?>><?php echo $i; ?></option>
@@ -136,80 +141,12 @@ if (!isset($block_templates['default'])) {
                            name="blocks[<?php echo esc_attr($index); ?>][manual_override]" 
                            class="manual-override-toggle" 
                            value="1" 
-                           <?php checked(isset($block['manual_override']) && $block['manual_override']); ?>>
+                           <?php checked(isset($block['manual_override']) && $block['manual_override']); ?>
+                           <?php echo ($block['type'] === 'html' || $block['type'] === 'wysiwyg') ? 'disabled' : ''; ?>>
                     <?php esc_html_e('Manual Override Stories', 'newsletter'); ?>
                 </label>
             </div>
         </div>
-
-        <!-- WYSIWYG Block -->
-        <?php if ($block['type'] === 'wysiwyg'): ?>
-<!-- WYSIWYG Block -->
-<div class="wysiwyg-block" <?php if ($block['type'] !== 'wysiwyg') echo 'style="display:none;"'; ?>>
-    <label><?php esc_html_e('WYSIWYG Content:', 'newsletter'); ?></label>
-    <?php
-    $editor_id = 'wysiwyg-editor-' . $index;
-    $wysiwyg_content = isset($block['wysiwyg']) ? wp_kses_post($block['wysiwyg']) : '';
-    
-    // Add error logging
-    error_log("Initializing WYSIWYG editor $editor_id with content: " . $wysiwyg_content);
-    
-    // Store the original content in a hidden field for comparison
-    echo '<input type="hidden" id="' . esc_attr($editor_id) . '-original" value="' . esc_attr($wysiwyg_content) . '">';
-    
-    wp_editor(
-        $wysiwyg_content,
-        $editor_id,
-        array(
-            'textarea_name' => 'blocks[' . esc_attr($index) . '][wysiwyg]',
-            'media_buttons' => true,
-            'textarea_rows' => 15,
-            'editor_class' => 'wysiwyg-editor-content',
-            'tinymce' => array(
-                'wpautop' => true,
-                'plugins' => 'paste,lists,link,textcolor,wordpress,wplink,hr,charmap,wptextpattern',
-                'toolbar1' => 'formatselect,bold,italic,bullist,numlist,link,unlink,forecolor,hr',
-                'init_instance_callback' => "function(editor) {
-                    editor.on('change keyup NodeChange SetContent', function() {
-                        editor.save();
-                        var content = editor.getContent();
-                        var originalContent = jQuery('#' + editor.id + '-original').val();
-                        
-                        // Only trigger change if content has actually changed
-                        if (content !== originalContent) {
-                            jQuery('#' + editor.id + '-original').val(content);
-                            jQuery(editor.getElement()).trigger('change');
-                        }
-                    });
-                    
-                    editor.on('blur', function() {
-                        editor.save();
-                    });
-                }",
-                'setup' => "function(editor) {
-                    editor.on('init', function() {
-                        var content = editor.getContent();
-                        jQuery('#' + editor.id + '-original').val(content);
-                    });
-                    
-                    editor.on('BeforeSetContent', function(e) {
-                        if (e.content === '' || e.content === '<p></p>') {
-                            var originalContent = jQuery('#' + editor.id + '-original').val();
-                            if (originalContent) {
-                                e.content = originalContent;
-                            }
-                        }
-                    });
-                }"
-            ),
-            'quicktags' => true
-        )
-    );
-    ?>
-</div>
-        <?php else: ?>
-            <div class="wysiwyg-block" style="display:none;"></div>
-        <?php endif; ?>
 
         <!-- Content Block Section -->
         <div class="content-block" <?php if ($block['type'] !== 'content') echo 'style="display:none;"'; ?>>
@@ -236,14 +173,21 @@ if (!isset($block_templates['default'])) {
                             $order_b = isset($selected_posts[$b->ID]['order']) ? intval($selected_posts[$b->ID]['order']) : PHP_INT_MAX;
                             return $order_a - $order_b;
                         });
-                        echo '<ul class="sortable-posts" ' . (!isset($block['manual_override']) || !$block['manual_override'] ? 'style="pointer-events: none; opacity: 0.7;"' : '') . '>';
+                        echo '<ul class="sortable-posts">';
+                        $post_counter = 0;
                         foreach ($posts as $post) {
+                            $post_counter++;
                             $post_id = $post->ID;
                             $checked = isset($selected_posts[$post_id]['checked']) ? 'checked' : '';
+                            if (!isset($block['manual_override']) || !$block['manual_override']) {
+                                // When not in manual mode, check based on story count
+                                $story_count = isset($block['story_count']) && $block['story_count'] !== 'disable' ? intval($block['story_count']) : PHP_INT_MAX;
+                                $checked = $post_counter <= $story_count ? 'checked' : '';
+                            }
                             $thumbnail_url = get_the_post_thumbnail_url($post_id, 'thumbnail') ?: '';
-                            $order = isset($selected_posts[$post_id]['order']) ? intval($selected_posts[$post_id]['order']) : PHP_INT_MAX;
+                            $order = isset($selected_posts[$post_id]['order']) ? intval($selected_posts[$post_id]['order']) : $post_counter;
                             ?>
-                            <li data-post-id="<?php echo esc_attr($post_id); ?>">
+                            <li data-post-id="<?php echo esc_attr($post_id); ?>" class="story-item">
                                 <span class="dashicons dashicons-sort story-drag-handle" style="cursor: move; margin-right: 10px;"></span>
                                 <label>
                                     <input type="checkbox" 
@@ -274,6 +218,72 @@ if (!isset($block_templates['default'])) {
         <div class="html-block" <?php if ($block['type'] !== 'html') echo 'style="display:none;"'; ?>>
             <label><?php esc_html_e('Custom HTML:', 'newsletter'); ?></label>
             <textarea name="blocks[<?php echo esc_attr($index); ?>][html]" rows="5" style="width:100%;"><?php echo isset($block['html']) ? esc_textarea($block['html']) : ''; ?></textarea>
+        </div>
+
+        <!-- WYSIWYG Block -->
+        <div class="wysiwyg-block" <?php if ($block['type'] !== 'wysiwyg') echo 'style="display:none;"'; ?>>
+            <label><?php esc_html_e('WYSIWYG Content:', 'newsletter'); ?></label>
+            <?php
+            $editor_id = 'wysiwyg-editor-' . $index;
+            $wysiwyg_content = isset($block['wysiwyg']) ? wp_kses_post($block['wysiwyg']) : '';
+            
+            // Store the original content in a hidden field for comparison
+            echo '<input type="hidden" id="' . esc_attr($editor_id) . '-original" value="' . esc_attr($wysiwyg_content) . '">';
+            
+            if ($block['type'] === 'wysiwyg') {
+                wp_editor(
+                    $wysiwyg_content,
+                    $editor_id,
+                    array(
+                        'textarea_name' => 'blocks[' . esc_attr($index) . '][wysiwyg]',
+                        'media_buttons' => true,
+                        'textarea_rows' => 15,
+                        'editor_class' => 'wysiwyg-editor-content',
+                        'tinymce' => array(
+                            'wpautop' => true,
+                            'plugins' => 'paste,lists,link,textcolor,wordpress,wplink,hr,charmap,wptextpattern',
+                            'toolbar1' => 'formatselect,bold,italic,bullist,numlist,link,unlink,forecolor,hr',
+                            'init_instance_callback' => "function(editor) {
+                                editor.on('change keyup NodeChange SetContent', function() {
+                                    editor.save();
+                                    var content = editor.getContent();
+                                    var originalContent = jQuery('#' + editor.id + '-original').val();
+                                    
+                                    // Only trigger change if content has actually changed
+                                    if (content !== originalContent) {
+                                        jQuery('#' + editor.id + '-original').val(content);
+                                        jQuery(editor.getElement()).trigger('change');
+                                    }
+                                });
+                                
+                                editor.on('blur', function() {
+                                    editor.save();
+                                });
+                            }",
+                            'setup' => "function(editor) {
+                                editor.on('init', function() {
+                                    var content = editor.getContent();
+                                    jQuery('#' + editor.id + '-original').val(content);
+                                });
+                                
+                                editor.on('BeforeSetContent', function(e) {
+                                    if (e.content === '' || e.content === '<p></p>') {
+                                        var originalContent = jQuery('#' + editor.id + '-original').val();
+                                        if (originalContent) {
+                                            e.content = originalContent;
+                                        }
+                                    }
+                                });
+                            }"
+                        ),
+                        'quicktags' => true
+                    )
+                );
+            } else {
+                // If not a WYSIWYG block, just output a hidden textarea to store the content
+                echo '<textarea id="' . esc_attr($editor_id) . '" name="blocks[' . esc_attr($index) . '][wysiwyg]" style="display:none;">' . esc_textarea($wysiwyg_content) . '</textarea>';
+            }
+            ?>
         </div>
 
         <button type="button" class="button remove-block"><?php esc_html_e('Remove Block', 'newsletter'); ?></button>

@@ -16,53 +16,49 @@ if (!function_exists('get_newsletter_posts')) {
                 continue;
             }
 
-            $current_block = [
-                'type'        => $block['type'],
-                'title'       => isset($block['title']) ? stripslashes(sanitize_text_field($block['title'])) : '',
-                'block_title' => isset($block['title']) ? stripslashes(sanitize_text_field($block['title'])) : '',
-                'show_title'  => isset($block['show_title']) ? (bool)$block['show_title'] : true,
-                'template_id' => isset($block['template_id']) ? sanitize_text_field($block['template_id']) : 'default',
-                'category'    => isset($block['category']) ? sanitize_text_field($block['category']) : '',
-                'date_range'  => isset($block['date_range']) ? $block['date_range'] : '',
-                'story_count' => isset($block['story_count']) ? $block['story_count'] : 'disable',
-                'manual_override' => isset($block['manual_override']) ? (bool)$block['manual_override'] : false,
-                'posts'       => []
+            $block_data = [
+                'type' => $block['type'],
+                'show_title' => isset($block['show_title']) ? (bool)$block['show_title'] : true,
+                'title' => isset($block['title']) ? sanitize_text_field($block['title']) : '',
+                'block_title' => isset($block['block_title']) ? sanitize_text_field($block['block_title']) : '',
+                'template_id' => isset($block['template_id']) ? sanitize_text_field($block['template_id']) : 'default'
             ];
 
-            switch ($block['type']) {
-                case 'content':
-                    if (!empty($block['posts'])) {
-                        foreach ($block['posts'] as $post_id => $post_data) {
-                            if (isset($post_data['checked']) && $post_data['checked']) {
-                                $current_block['posts'][$post_id] = [
-                                    'checked' => '1',
-                                    'order' => isset($post_data['order']) ? $post_data['order'] : '0'
-                                ];
-                            }
-                        }
+            if ($block['type'] === 'content' && !empty($block['posts'])) {
+                // Get selected posts in their saved order
+                $selected_posts = [];
+                foreach ($block['posts'] as $post_id => $post_data) {
+                    if (isset($post_data['checked']) && $post_data['checked'] === '1') {
+                        $selected_posts[$post_id] = $post_data;
                     }
-                    error_log("Added content block to newsletter data");
-                    break;
+                }
 
-                case 'html':
-                    $current_block['html'] = isset($block['html']) ? wp_kses_post(stripslashes($block['html'])) : '';
-                    error_log("Added HTML block to newsletter data");
-                    break;
+                // Sort selected posts by their order
+                uasort($selected_posts, function($a, $b) {
+                    $order_a = isset($a['order']) ? intval($a['order']) : PHP_INT_MAX;
+                    $order_b = isset($b['order']) ? intval($b['order']) : PHP_INT_MAX;
+                    return $order_a - $order_b;
+                });
 
-                case 'wysiwyg':
-                    $content = isset($block['wysiwyg']) ? stripslashes($block['wysiwyg']) : '';
-                    if (!empty($content) && strpos($content, '<p>') === false) {
-                        $content = wpautop($content);
+                // Get post objects in the correct order
+                $ordered_posts = [];
+                foreach ($selected_posts as $post_id => $post_data) {
+                    $post = get_post($post_id);
+                    if ($post) {
+                        $ordered_posts[] = $post;
                     }
-                    $current_block['wysiwyg'] = wp_kses_post($content);
-                    error_log("Added WYSIWYG block to newsletter data. Content length: " . strlen($content));
-                    break;
+                }
+
+                $block_data['posts'] = $ordered_posts;
+            } elseif ($block['type'] === 'html') {
+                $block_data['html'] = isset($block['html']) ? wp_kses_post($block['html']) : '';
+            } elseif ($block['type'] === 'wysiwyg') {
+                $block_data['wysiwyg'] = isset($block['wysiwyg']) ? wp_kses_post($block['wysiwyg']) : '';
             }
 
-            $newsletter_data[] = $current_block;
+            $newsletter_data[] = $block_data;
         }
 
-        error_log("Final newsletter data contains " . count($newsletter_data) . " blocks");
         return $newsletter_data;
     }
 }
@@ -96,7 +92,7 @@ if (!function_exists('newsletter_generate_preview_content')) {
                 $newsletter_html .= '<h2>' . esc_html($title) . '</h2>';
             }
 
-            if ($block_data['type'] === 'content') {
+            if ($block_data['type'] === 'content' && !empty($block_data['posts'])) {
                 $template_id = isset($block_data['template_id']) ? $block_data['template_id'] : 'default';
                 $template_content = '';
 
@@ -117,55 +113,39 @@ if (!function_exists('newsletter_generate_preview_content')) {
                     }
                 }
 
-                if (!empty($block_data['posts'])) {
-                    foreach ($block_data['posts'] as $post_id => $post_data) {
-                        if (!isset($post_data['checked']) || !$post_data['checked']) {
-                            continue;
-                        }
+                foreach ($block_data['posts'] as $post) {
+                    $block_content = $template_content;
+                    $thumbnail_url = get_the_post_thumbnail_url($post->ID, 'full');
 
-                        $post = get_post($post_id);
-                        if (!$post) {
-                            error_log("Post not found: $post_id");
-                            continue;
-                        }
+                    // Handle conditional thumbnail tags
+                    if (!empty($thumbnail_url)) {
+                        $block_content = preg_replace('/\{if_thumbnail\}(.*?)\{\/if_thumbnail\}/s', '$1', $block_content);
+                    } else {
+                        $block_content = preg_replace('/\{if_thumbnail\}.*?\{\/if_thumbnail\}/s', '', $block_content);
+                    }
 
-                        $block_content = $template_content;
-                        $thumbnail_url = get_the_post_thumbnail_url($post_id, 'full');
+                    try {
+                        $replacements = [
+                            '{title}'         => esc_html($post->post_title),
+                            '{content}'       => wp_kses_post($post->post_content),
+                            '{thumbnail_url}' => esc_url($thumbnail_url),
+                            '{permalink}'     => esc_url(get_permalink($post->ID)),
+                            '{excerpt}'       => wp_kses_post(get_the_excerpt($post)),
+                            '{author}'        => esc_html(get_the_author_meta('display_name', $post->post_author)),
+                            '{publish_date}'  => esc_html(get_the_date('', $post->ID)),
+                            '{categories}'    => esc_html(implode(', ', wp_get_post_categories($post->ID, ['fields' => 'names'])))
+                        ];
 
-                        // Handle conditional thumbnail tags
-                        if (!empty($thumbnail_url)) {
-                            $block_content = preg_replace('/\{if_thumbnail\}(.*?)\{\/if_thumbnail\}/s', '$1', $block_content);
-                        } else {
-                            $block_content = preg_replace('/\{if_thumbnail\}.*?\{\/if_thumbnail\}/s', '', $block_content);
-                        }
-
-                        try {
-                            $replacements = [
-                                '{title}'         => esc_html($post->post_title),
-                                '{content}'       => wp_kses_post($post->post_content),
-                                '{thumbnail_url}' => esc_url($thumbnail_url),
-                                '{permalink}'     => esc_url(get_permalink($post_id)),
-                                '{excerpt}'       => wp_kses_post(get_the_excerpt($post)),
-                                '{author}'        => esc_html(get_the_author_meta('display_name', $post->post_author)),
-                                '{publish_date}'  => esc_html(get_the_date('', $post_id)),
-                                '{categories}'    => esc_html(implode(', ', wp_get_post_categories($post_id, ['fields' => 'names'])))
-                            ];
-
-                            $newsletter_html .= strtr($block_content, $replacements);
-                        } catch (Exception $e) {
-                            error_log("Error processing post ID: $post_id - " . $e->getMessage());
-                            continue;
-                        }
+                        $newsletter_html .= strtr($block_content, $replacements);
+                    } catch (Exception $e) {
+                        error_log("Error processing post ID: " . $post->ID . " - " . $e->getMessage());
+                        continue;
                     }
                 }
-            } elseif ($block_data['type'] === 'html') {
+            } elseif ($block_data['type'] === 'html' && isset($block_data['html'])) {
                 $newsletter_html .= wp_kses_post(wp_unslash($block_data['html']));
-            } elseif ($block_data['type'] === 'wysiwyg') {
-                $content = isset($block_data['wysiwyg']) ? $block_data['wysiwyg'] : '';
-                $newsletter_html .= sprintf(
-                    '<div class="wysiwyg-content">%s</div>',
-                    wp_kses_post($content)
-                );
+            } elseif ($block_data['type'] === 'wysiwyg' && isset($block_data['wysiwyg'])) {
+                $newsletter_html .= wp_kses_post(wp_unslash($block_data['wysiwyg']));
             }
 
             $newsletter_html .= '</div>';

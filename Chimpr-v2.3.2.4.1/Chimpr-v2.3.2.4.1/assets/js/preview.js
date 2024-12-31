@@ -3,33 +3,100 @@
     let previewUpdatePromise = null;
     let previewInitialized = false;
 
-    window.updatePreview = function(skipAutoSave) {
+    // Initialize state if not already done
+    if (!window.newsletterState) {
+        window.newsletterState = {
+            blocksLoaded: 0,
+            totalBlocks: 0,
+            postsData: {},
+            isReady: false,
+            isUpdateInProgress: false
+        };
+    }
+
+    window.updatePreview = function(trigger = 'manual') {
+        // Only update if all data is loaded or if it's a manual update
+        if (window.newsletterState && !window.newsletterState.isReady && trigger !== 'manual') {
+            console.log('Skipping preview update - not ready');
+            return;
+        }
+
         // Cancel any existing preview update
         if (previewUpdatePromise && previewUpdatePromise.abort) {
             previewUpdatePromise.abort();
         }
 
-        var formData = $('#blocks-form').serializeArray();
-        formData.push({ name: 'action', value: 'generate_preview' });
-        formData.push({ name: 'newsletter_slug', value: newsletterData.newsletterSlug });
-        formData.push({ name: 'security', value: newsletterData.nonceGeneratePreview });
+        const $previewContent = $('#preview-content');
+        $previewContent.addClass('loading');
 
+        // Get current blocks state
+        const blocks = [];
+        $('#blocks-container .block-item').each(function() {
+            const $block = $(this);
+            const blockData = {
+                type: $block.find('.block-type').val(),
+                title: $block.find('.block-title-input').val(),
+                show_title: $block.find('.show-title-toggle').prop('checked'),
+                template_id: $block.find('.block-template').val(),
+                category: $block.find('.block-category').val(),
+                date_range: $block.find('.block-date-range').val(),
+                story_count: $block.find('.block-story-count').val(),
+                manual_override: $block.find('input[name*="[manual_override]"]').prop('checked'),
+                posts: {}
+            };
+
+            // Get selected posts
+            $block.find('.sortable-posts input[type="checkbox"]:checked').each(function() {
+                const $checkbox = $(this);
+                const postId = $checkbox.closest('li').data('post-id');
+                const order = $checkbox.closest('li').find('.post-order').val();
+                blockData.posts[postId] = {
+                    checked: '1',
+                    order: order
+                };
+            });
+
+            if (blockData.type === 'html') {
+                blockData.html = $block.find('textarea[name*="[html]"]').val();
+            } else if (blockData.type === 'wysiwyg') {
+                const editorId = $block.find('.wysiwyg-editor-content').attr('id');
+                if (tinymce.get(editorId)) {
+                    tinymce.get(editorId).save(); // Save content to textarea
+                    blockData.wysiwyg = tinymce.get(editorId).getContent();
+                } else {
+                    blockData.wysiwyg = $block.find('.wysiwyg-editor-content').val();
+                }
+            }
+
+            blocks.push(blockData);
+        });
+
+        // Generate preview
         previewUpdatePromise = $.ajax({
             url: newsletterData.ajaxUrl,
             method: 'POST',
-            dataType: 'json',
-            data: formData,
+            data: {
+                action: 'generate_preview',
+                security: newsletterData.nonceGeneratePreview,
+                newsletter_slug: newsletterData.newsletterSlug,
+                saved_selections: JSON.stringify(blocks)
+            },
             success: function(response) {
                 if (response.success) {
-                    $('#preview-content').html(response.data);
+                    $previewContent.html(response.data);
                 } else {
-                    $('#preview-content').html('<p>' + response.data + '</p>');
+                    console.error('Preview generation failed:', response.data);
+                    $previewContent.html('<p class="error">Error generating preview</p>');
                 }
             },
             error: function(xhr, status, error) {
-                $('#preview-content').html('<p>Error generating preview: ' + error + '</p>');
+                if (status !== 'abort') {
+                    console.error('Ajax error:', error);
+                    $previewContent.html('<p class="error">Error generating preview</p>');
+                }
             },
             complete: function() {
+                $previewContent.removeClass('loading');
                 previewUpdatePromise = null;
             }
         });
@@ -41,11 +108,24 @@
         previewInitialized = true;
 
         // Initial preview update
-        updatePreview();
+        updatePreview('initial_load');
 
         // Set up direct preview updates for certain changes
         $('#blocks-container').on('change', '.block-type, .block-template', function() {
-            updatePreview();
+            if (window.newsletterState.isReady) {
+                updatePreview('type_template_change');
+            }
+        });
+
+        // Handle WYSIWYG editor changes
+        $('#blocks-container').on('change keyup paste input', '.wysiwyg-editor-content', function() {
+            if (window.newsletterState.isReady) {
+                const editorId = $(this).attr('id');
+                if (tinymce.get(editorId)) {
+                    tinymce.get(editorId).save();
+                }
+                updatePreview('wysiwyg_content_change');
+            }
         });
     }
 

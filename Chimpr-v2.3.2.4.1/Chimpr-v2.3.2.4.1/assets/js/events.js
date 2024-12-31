@@ -62,6 +62,23 @@ $(document).off('click', '#reset-blocks').on('click', '#reset-blocks', function(
     });
 });
 
+// Story count change
+$(document).off('change.newsletter', '.block-story-count').on('change.newsletter', '.block-story-count', function() {
+    var $block = $(this).closest('.block-item');
+    var storyCount = $(this).val();
+    handleStoryCountChange($block, storyCount);
+});
+
+// Manual override checkbox handler
+$(document).off('change.newsletter', '.manual-override-toggle').on('change.newsletter', '.manual-override-toggle', function() {
+    var $block = $(this).closest('.block-item');
+    var isManual = $(this).prop('checked');
+    console.log('Manual override toggled:', isManual);
+    
+    // Ensure we reinitialize sortable with the new state
+    handleManualOverrideToggle($block, isManual);
+});
+
 // Category/Date range change
 $(document).off('change.newsletter', '.block-category, .block-date-range')
     .on('change.newsletter', '.block-category, .block-date-range', function() {

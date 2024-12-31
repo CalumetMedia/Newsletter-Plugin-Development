@@ -74,154 +74,134 @@ function newsletter_load_block_posts() {
 
         error_log('Newsletter Load - Block ' . $block_index . ' normalized selections: ' . print_r($normalized_selections, true));
 
+        // Build the WP_Query arguments
         $posts_args = [
             'post_type'   => 'post',
             'cat'         => $category_id,
-            'orderby'     => 'date',
-            'order'       => 'DESC',
             'post_status' => ['publish', 'future'],
-            'posts_per_page' => -1
+            'posts_per_page' => -1,
+            'ignore_sticky_posts' => true,
+            'no_found_rows' => true,
+            'update_post_meta_cache' => false,
+            'update_post_term_cache' => false
         ];
 
         // Add date range filter
+        $today = current_time('Y-m-d H:i:s');
+        $future_date = date('Y-m-d H:i:s', strtotime("+7 days")); 
+
         if ($date_range > 0) {
-            $today = current_time('Y-m-d H:i:s');
             $past_date = date('Y-m-d H:i:s', strtotime("-{$date_range} days"));
-            $future_date = date('Y-m-d H:i:s', strtotime("+7 days")); // Always look 7 days ahead for scheduled posts
             
             $posts_args['date_query'] = [
                 'relation' => 'OR',
-                // Published posts within the selected date range
                 [
                     'after' => $past_date,
                     'before' => $today,
                     'inclusive' => true,
-                    'post_status' => 'publish',
+                    'column' => 'post_date'
                 ],
-                // Scheduled posts for the next 7 days (regardless of past date range)
                 [
                     'after' => $today,
                     'before' => $future_date,
                     'inclusive' => true,
-                    'post_status' => 'future'
+                    'column' => 'post_date'
                 ]
             ];
         } else {
-            // If date_range is 0 (All), get all published posts and next 7 days of scheduled posts
-            $today = current_time('Y-m-d H:i:s');
-            $future_date = date('Y-m-d H:i:s', strtotime("+7 days"));
-            
             $posts_args['date_query'] = [
                 'relation' => 'OR',
                 [
                     'before' => $today,
                     'inclusive' => true,
-                    'post_status' => 'publish',
+                    'column' => 'post_date'
                 ],
                 [
                     'after' => $today,
                     'before' => $future_date,
                     'inclusive' => true,
-                    'post_status' => 'future'
+                    'column' => 'post_date'
                 ]
             ];
         }
-        
-        // Use WP_Query instead of get_posts for more control
+
+        // Execute query
         $query = new WP_Query($posts_args);
         $posts = $query->posts;
 
-        // Sort posts by date, putting future posts first
-        usort($posts, function($a, $b) {
-            // If one is future and one isn't, prioritize future
-            $a_is_future = $a->post_status === 'future';
-            $b_is_future = $b->post_status === 'future';
-            
-            if ($a_is_future && !$b_is_future) return -1;
-            if (!$a_is_future && $b_is_future) return 1;
-            
-            // If both are future or both are published, sort by date
-            return strtotime($b->post_date) - strtotime($a->post_date);
-        });
+        error_log('Newsletter Load - Block ' . $block_index . ' found ' . count($posts) . ' posts');
 
         if ($posts) {
             $html = '<ul class="sortable-posts"' . (!$manual_override ? ' style="pointer-events: none; opacity: 0.7;"' : '') . '>';
             
-            $selected_posts = [];
-            $post_orders = [];
-            $posts_to_display = $posts; // Default to date-sorted posts
+            // Create a map of post IDs to posts for easier lookup
+            $posts_map = array();
+            foreach ($posts as $post) {
+                $posts_map[$post->ID] = $post;
+            }
             
-            // Process saved selections if they exist
+            // First, add posts that have saved selections in the correct order
+            $ordered_posts = array();
             if (!empty($normalized_selections)) {
-                foreach ($posts as $post) {
-                    $post_id = $post->ID;
-                    // Only consider posts that are explicitly checked
-                    if (isset($normalized_selections[$post_id]) && $normalized_selections[$post_id]['checked'] === '1') {
-                        $selected_posts[] = $post_id;
-                        $post_orders[$post_id] = $normalized_selections[$post_id]['order'];
+                // Sort normalized selections by order
+                uasort($normalized_selections, function($a, $b) {
+                    return intval($a['order']) - intval($b['order']);
+                });
+                
+                // Add selected posts first, in their saved order
+                foreach ($normalized_selections as $post_id => $selection) {
+                    if (isset($posts_map[$post_id]) && $selection['checked'] === '1') {
+                        $ordered_posts[] = $posts_map[$post_id];
+                        unset($posts_map[$post_id]);
                     }
-                }
-
-                // Only sort by saved order if we have saved orders and are in manual mode
-                if (!empty($post_orders) && $manual_override) {
-                    usort($posts_to_display, function($a, $b) use ($post_orders) {
-                        $order_a = isset($post_orders[$a->ID]) ? $post_orders[$a->ID] : PHP_INT_MAX;
-                        $order_b = isset($post_orders[$b->ID]) ? $post_orders[$b->ID] : PHP_INT_MAX;
-                        if ($order_a === $order_b) {
-                            return strtotime($b->post_date) - strtotime($a->post_date);
-                        }
-                        return $order_a - $order_b;
-                    });
                 }
             }
             
-            foreach ($posts_to_display as $index => $post) {
+            // Then add remaining posts sorted by date
+            if (!empty($posts_map)) {
+                $remaining_posts = array_values($posts_map);
+                usort($remaining_posts, function($a, $b) {
+                    return strtotime($b->post_date) - strtotime($a->post_date);
+                });
+                $ordered_posts = array_merge($ordered_posts, $remaining_posts);
+            }
+            
+            // Output posts in final order
+            foreach ($ordered_posts as $index => $post) {
                 $post_id = $post->ID;
                 $is_scheduled = $post->post_status === 'future';
                 $scheduled_label = $is_scheduled ? '<span class="newsletter-status schedule" style="margin-left:10px;">SCHEDULED</span>' : '';
                 
                 $checked = '';
                 if ($manual_override) {
-                    // In manual mode, only checked if explicitly set to '1'
                     $checked = (isset($normalized_selections[$post_id]) && 
                               $normalized_selections[$post_id]['checked'] === '1') ? 'checked' : '';
                 } else {
-                    // In automatic mode, select based on story count
-                    if ($story_count !== 'disable') {
-                        $checked = ($index < intval($story_count)) ? 'checked' : '';
-                    } else {
-                        $checked = 'checked';
-                    }
+                    // In automatic mode, check based on story count
+                    $checked = ($story_count === 'disable' || $index < intval($story_count)) ? 'checked' : '';
                 }
                 
-                $html .= '<li data-post-id="' . esc_attr($post_id) . '" class="sortable-post-item">';
-                $html .= '<span class="dashicons dashicons-sort story-drag-handle" style="cursor: ' . (!$manual_override ? 'default' : 'move') . '; margin-right: 10px;"></span>';
-                $html .= '<label>';
-                $html .= '<input type="checkbox" 
-                                name="blocks[' . esc_attr($block_index) . '][posts][' . esc_attr($post_id) . '][checked]" 
-                                value="1" 
-                                ' . $checked . '
-                                ' . (!$manual_override ? 'disabled' : '') . '> ';
-                
-                $thumbnail_url = get_the_post_thumbnail_url($post_id, 'thumbnail');
-                if ($thumbnail_url) {
-                    $html .= '<img src="' . esc_url($thumbnail_url) . '" 
-                                  alt="' . esc_attr($post->post_title) . '" 
-                                  style="width:50px; height:auto; margin-right:10px; vertical-align: middle;">';
-                }
-                
-                $html .= esc_html($post->post_title) . $scheduled_label;
-                $html .= '</label>';
-                
-                // Always use the current index for order when manual override is disabled
-                $order = ($manual_override && isset($post_orders[$post_id])) ? $post_orders[$post_id] : $index;
-                
-                $html .= '<input type="hidden" 
-                                class="post-order" 
-                                name="blocks[' . esc_attr($block_index) . '][posts][' . esc_attr($post_id) . '][order]" 
-                                value="' . esc_attr($order) . '">';
-                
-                $html .= '</li>';
+                $order_value = isset($normalized_selections[$post_id]) ? 
+                    $normalized_selections[$post_id]['order'] : $index;
+
+                $html .= sprintf(
+                    '<li class="sortable-post-item" data-post-id="%d" data-post-date="%s">
+                        <span class="dashicons dashicons-menu story-drag-handle"></span>
+                        <input type="checkbox" name="blocks[%d][posts][%d][checked]" value="1" %s>
+                        <input type="hidden" name="blocks[%d][posts][%d][order]" value="%s" class="post-order">
+                        <label>%s%s</label>
+                    </li>',
+                    $post_id,
+                    $post->post_date,
+                    $block_index,
+                    $post_id,
+                    $checked,
+                    $block_index,
+                    $post_id,
+                    $order_value,
+                    esc_html($post->post_title),
+                    $scheduled_label
+                );
             }
             $html .= '</ul>';
             
@@ -245,3 +225,44 @@ function newsletter_load_block_posts() {
     }
 }
 add_action('wp_ajax_load_block_posts', 'newsletter_load_block_posts');
+
+function newsletter_load_block_content() {
+    check_ajax_referer('load_block_posts_nonce', 'security');
+
+    $block_type = isset($_POST['block_type']) ? sanitize_text_field($_POST['block_type']) : '';
+    $block_index = isset($_POST['block_index']) ? intval($_POST['block_index']) : 0;
+    $newsletter_slug = isset($_POST['newsletter_slug']) ? sanitize_text_field($_POST['newsletter_slug']) : '';
+
+    if ($block_type === 'wysiwyg') {
+        // Get existing blocks
+        $blocks = get_option("newsletter_blocks_$newsletter_slug", []);
+        $wysiwyg_content = isset($blocks[$block_index]['wysiwyg']) ? wp_kses_post($blocks[$block_index]['wysiwyg']) : '';
+        
+        ob_start();
+        ?>
+        <label><?php esc_html_e('WYSIWYG Content:', 'newsletter'); ?></label>
+        <?php
+        $editor_id = 'wysiwyg-editor-' . $block_index;
+        wp_editor(
+            $wysiwyg_content,
+            $editor_id,
+            array(
+                'textarea_name' => 'blocks[' . esc_attr($block_index) . '][wysiwyg]',
+                'media_buttons' => true,
+                'textarea_rows' => 15,
+                'editor_class' => 'wysiwyg-editor-content',
+                'tinymce' => array(
+                    'wpautop' => true,
+                    'plugins' => 'paste,lists,link,textcolor,wordpress,wplink,hr,charmap,wptextpattern',
+                    'toolbar1' => 'formatselect,bold,italic,bullist,numlist,link,unlink,forecolor,hr'
+                ),
+                'quicktags' => true
+            )
+        );
+        $content = ob_get_clean();
+        wp_send_json_success($content);
+    }
+
+    wp_send_json_error('Invalid block type');
+}
+add_action('wp_ajax_load_block_content', 'newsletter_load_block_content');

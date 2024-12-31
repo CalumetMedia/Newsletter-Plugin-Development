@@ -83,6 +83,183 @@
 4. Enhanced logging to track block changes
 **Details**: See `/knowledge-base/features/saving-blocks.md` and `/knowledge-base/2024/12/blocks-save-issue-20241230-1514.md`
 
+### Story Count Selection Not Updating (v2.3.2.4.1)
+**Issue**: Story count selection changes were not immediately reflected in the UI, only after save and reload.
+**Root Cause**: Event handlers for story count changes were not properly bound and state management was inconsistent.
+**Solution**: 
+1. Implemented proper event handling with namespaced events
+2. Added state management for story count changes
+3. Ensured proper initialization of story count on block creation
+4. Added manual override mode handling
+**Details**: See `/knowledge-base/2024/12/story-count-selection-issue-20241230-2300.md`
+
+### Preview Content Generation Issue (v2.3.2.4.1)
+**Issue**: Preview content was not displaying stories due to incorrect template content retrieval.
+**Root Cause**: 
+1. Template content was being accessed using incorrect array key ('content' instead of 'html')
+2. Template variable replacements were using incorrect case (uppercase instead of lowercase)
+3. Missing proper fallback for template content when not found
+**Solution**: 
+1. Fixed template content retrieval to use correct 'html' key
+2. Restored proper template variable case handling
+3. Added proper template fallback logic
+4. Restored thumbnail conditional handling
+5. Added comprehensive error handling for post processing
+**Details**: See `/knowledge-base/2024/12/preview-content-issue-20241230-2330.md`
+
+### Critical Template Variable Usage - v2.3.2.4.1
+This is a critical issue affecting template content handling.
+
+#### Template Variable Standards:
+1. Variable Case:
+   - Always use lowercase for template variables (e.g., '{title}', '{content}')
+   - Never use uppercase variants (e.g., '{TITLE}', '{CONTENT}')
+
+2. Template Content Storage:
+   - Templates must store content in 'html' key
+   - Never use alternative keys like 'content' or 'template'
+
+3. Required Template Variables:
+   ```
+   {title} - Post title
+   {content} - Post content
+   {thumbnail_url} - Featured image URL
+   {permalink} - Post URL
+   {excerpt} - Post excerpt
+   {author} - Post author name
+   {publish_date} - Post publication date
+   {categories} - Post categories
+   ```
+
+4. Conditional Tags:
+   ```
+   {if_thumbnail}...{/if_thumbnail} - Content shown only if thumbnail exists
+   ```
+
+#### Prevention Measures:
+1. Template Validation:
+   - Always verify template exists before use
+   - Check for 'html' key in template data
+   - Provide proper fallback template
+   - Log template retrieval failures
+
+2. Variable Replacement:
+   - Use consistent lowercase variables
+   - Maintain all required variables
+   - Preserve conditional logic
+   - Handle missing data gracefully
+
+3. Error Prevention:
+   - Validate template structure
+   - Check template content exists
+   - Verify variable replacements
+   - Log processing errors
+
+**Details**: See `/knowledge-base/2024/12/preview-content-issue-20241230-2330.md`
+
+### WYSIWYG Editor Initialization Issue (v2.3.2.4.1)
+**Issue**: WYSIWYG editor window was not initializing when changing block type, requiring a save and refresh.
+**Root Cause**: 
+1. Editor initialization was not properly handling the block type change event
+2. Existing editor instances were not being properly cleaned up
+3. DOM elements were not fully ready when editor was being initialized
+
+**Solution**: 
+1. Implemented proper cleanup of existing editor instances before initialization
+2. Added AJAX-based content loading for WYSIWYG blocks
+3. Improved editor initialization timing with proper delays
+4. Added explicit visibility handling for editor elements
+5. Enhanced error handling and state management during type changes
+
+**Critical Implementation Notes**:
+1. Editor Cleanup:
+   - Remove existing TinyMCE instances
+   - Clean up WordPress editor instances
+   - Reset DOM element states
+
+2. Content Loading:
+   - Load WYSIWYG content via AJAX
+   - Preserve existing content during type changes
+   - Handle initialization after content load
+
+3. Initialization Timing:
+   - Use appropriate delays for DOM readiness
+   - Handle visibility states explicitly
+   - Manage update states during transitions
+
+**Details**: See `/knowledge-base/2024/12/wysiwyg-init-issue-20241230-2400.md`
+
+### Manual Override Toggle Not Persisting (v2.3.2.4.1)
+**Issue**: Manual override checkbox was not staying checked when clicked, immediately reverting to unchecked state.
+**Root Cause**: 
+1. Multiple save operations were interfering with each other
+2. Unnecessary post reloading was causing state to reset
+3. Incorrect block comparison in state saving logic
+**Solution**: 
+1. Simplified manual override toggle handling
+2. Removed unnecessary post reloading
+3. Fixed block comparison in state saving
+4. Streamlined state management
+**Details**: See `/knowledge-base/2024/12/manual-override-toggle-issue-20241230-2400.md`
+
+### WYSIWYG Editor Display and Content Persistence (v2.3.2.4.1)
+**Issue**: WYSIWYG editor was not displaying properly when switching block types and content was not being preserved.
+**Root Cause**: 
+1. Editor initialization timing issues during block type changes
+2. Content not being properly preserved during editor cleanup and reinitialization
+3. DOM elements not being properly managed during editor transitions
+
+**Solution**: 
+1. Improved editor initialization and cleanup process:
+   ```javascript
+   // Store existing content before cleanup
+   var existingContent = '';
+   if (tinymce.get(editorId)) {
+       existingContent = tinymce.get(editorId).getContent();
+       tinymce.execCommand('mceRemoveEditor', true, editorId);
+   } else if ($('#' + editorId).length) {
+       existingContent = $('#' + editorId).val();
+   }
+   ```
+
+2. Enhanced textarea management:
+   ```javascript
+   // Ensure clean textarea with preserved content
+   $container.find('textarea').remove();
+   $container.append(
+       '<textarea id="' + editorId + '" ' +
+       'name="blocks[' + blockIndex + '][wysiwyg]" ' +
+       'class="wysiwyg-editor-content">' + existingContent + '</textarea>'
+   );
+   ```
+
+3. Improved initialization timing and state management:
+   - Added proper delays for DOM readiness
+   - Enhanced cleanup of existing editor instances
+   - Implemented proper state tracking during transitions
+   - Added comprehensive error handling
+
+**Critical Implementation Notes**:
+1. Content Preservation Rules:
+   - Always store existing content before cleanup
+   - Properly handle both TinyMCE and raw textarea content
+   - Ensure content is preserved during editor transitions
+   - Verify content after reinitialization
+
+2. Editor Instance Management:
+   - Clean up existing instances before creating new ones
+   - Handle both TinyMCE and WordPress editor instances
+   - Maintain proper state tracking during transitions
+   - Prevent duplicate initialization
+
+3. DOM Element Handling:
+   - Properly manage textarea visibility
+   - Handle editor container display states
+   - Ensure proper cleanup of old elements
+   - Maintain consistent element structure
+
+**Details**: See `/knowledge-base/2024/12/wysiwyg-display-persistence-issue-20241231-0100.md`
+
 ---
 
 ## Critical Implementation Issues

@@ -88,9 +88,21 @@ function get_newsletter_blocks_by_slug($slug) {
                 );
                 
                 $query = new WP_Query($args);
-                $current_count = 0;
+                $posts = $query->posts;
                 
-                foreach ($query->posts as $post) {
+                // Sort posts based on the saved order values
+                if (!empty($selected_posts)) {
+                    usort($posts, function($a, $b) use ($selected_posts) {
+                        $order_a = isset($selected_posts[$a->ID]['order']) ? intval($selected_posts[$a->ID]['order']) : PHP_INT_MAX;
+                        $order_b = isset($selected_posts[$b->ID]['order']) ? intval($selected_posts[$b->ID]['order']) : PHP_INT_MAX;
+                        return $order_a - $order_b;
+                    });
+                }
+                
+                $current_count = 0;
+                $block['posts'] = [];  // Reset posts array to maintain order
+                
+                foreach ($posts as $post) {
                     $post_id = $post->ID;
                     // Only include posts that are explicitly checked in manual mode
                     if (isset($selected_posts[$post_id]) && isset($selected_posts[$post_id]['checked']) && $selected_posts[$post_id]['checked'] === '1') {

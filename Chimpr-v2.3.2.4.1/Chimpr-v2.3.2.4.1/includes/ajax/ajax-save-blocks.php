@@ -300,17 +300,17 @@ function newsletter_handle_blocks_form_submission() {
                     );
                 }
 
-                if (isset($_POST['custom_header'])) {
+                if (isset($_POST['header_template'])) {
                     update_option(
-                        "newsletter_custom_header_$newsletter_slug", 
-                        wp_kses_post(wp_unslash($_POST['custom_header']))
+                        "newsletter_header_template_$newsletter_slug", 
+                        sanitize_text_field(wp_unslash($_POST['header_template']))
                     );
                 }
 
-                if (isset($_POST['custom_footer'])) {
+                if (isset($_POST['footer_template'])) {
                     update_option(
-                        "newsletter_custom_footer_$newsletter_slug", 
-                        wp_kses_post(wp_unslash($_POST['custom_footer']))
+                        "newsletter_footer_template_$newsletter_slug", 
+                        sanitize_text_field(wp_unslash($_POST['footer_template']))
                     );
                 }
             }

@@ -65,64 +65,79 @@
     font-size: 14px;
 }
 
-/* Button Styles */
-.button-group {
+/* Button Base Styles */
+.chimpr-button-group {
     display: flex;
-    justify-content: flex-start;
     gap: 10px;
     margin: 20px 0;
 }
 
-.button-group .button-large {
-    padding: 8px 16px;
-    font-size: 16px;
+.chimpr-button-group--horizontal {
+    justify-content: flex-start;
+    flex-direction: row;
 }
 
-.buttons {
-    display: flex;
+.chimpr-button-group--vertical {
     flex-direction: column;
-    gap: 15px;
     width: 100%;
 }
 
-.action-button {
-    height: 60px !important;
-    width: 100% !important;
-    display: flex !important;
+.chimpr-button {
+    height: 40px;
+    padding: 8px 16px;
+    font-size: 14px;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-size: 16px !important;
-    padding: 0 20px !important;
-    margin: 0 !important;
     gap: 10px;
-    border-radius: 8px;
-    font-weight: bold;
+    border-radius: 4px;
+    font-weight: 500;
     cursor: pointer;
     transition: background-color 0.3s ease, transform 0.2s ease;
+    text-decoration: none;
 }
 
-.action-button:hover {
-    transform: translateY(-2px);
+.chimpr-button:hover {
+    transform: translateY(-1px);
 }
 
-.action-button img {
-    height: 20px;
+.chimpr-button img {
+    height: 16px;
     width: auto;
 }
 
 /* Button Variants */
-.wrap .button-primary {
+.chimpr-button--primary {
     background-color: #0073aa;
     border-color: #0073aa;
     color: #fff;
 }
 
-.wrap .button-secondary {
+.chimpr-button--secondary {
     background-color: #f1f1f1;
     border-color: #ccc;
     color: #555;
 }
 
+.chimpr-button--success {
+    background-color: #46b450;
+    border-color: #46b450;
+    color: #fff;
+}
+
+.chimpr-button--danger {
+    background-color: #dc3545;
+    border-color: #dc3545;
+    color: #fff;
+}
+
+.chimpr-button--dark {
+    background-color: #000;
+    border-color: #000;
+    color: #fff;
+}
+
+/* Specific Button Styles */
 #add-block {
     background-color: #46b450;
     border-color: #46b450;
@@ -130,24 +145,23 @@
 }
 
 #save-blocks {
-    background-color: #0073aa !important;
-    border-color: #0073aa !important;
-    color: white !important;
+    background-color: #0073aa;
+    border-color: #0073aa;
+    color: white;
 }
 
 #send-to-mailchimp,
 #send-now,
 #send-test-email {
-    background-color: #000 !important;
-    border-color: #000 !important;
-    color: white !important;
+    background-color: #000;
+    border-color: #000;
+    color: white;
 }
 
-
 #send-now.send-now-confirmed {
-    background-color: #2ecc71 !important;
-    border-color: #2ecc71 !important;
-    color: #ffffff !important;
+    background-color: #2ecc71;
+    border-color: #2ecc71;
+    color: #ffffff;
 }
 
 #send-test-email {
@@ -168,7 +182,86 @@
 }
 
 .local-buttons .action-button {
-    width: 50% !important;
+    width: 25% !important;
+    height: 60px !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px !important;
+    padding: 0 15px !important;
+    margin: 0 !important;
+    gap: 8px;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none !important;
+}
+
+.local-buttons .button-icon {
+    font-size: 24px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Save Button - Primary Action */
+.save-button {
+    background-color: #2271b1 !important;
+    color: white !important;
+}
+
+.save-button:hover {
+    background-color: #135e96 !important;
+    transform: translateY(-2px);
+}
+
+/* Reset Button - Warning Action */
+.reset-button {
+    background-color: #f0ad4e !important;
+    color: white !important;
+}
+
+.reset-button:hover {
+    background-color: #ec971f !important;
+    transform: translateY(-2px);
+}
+
+/* PDF Button - Success Action */
+.pdf-button {
+    background-color: #28a745 !important;
+    color: white !important;
+}
+
+.pdf-button:hover {
+    background-color: #218838 !important;
+    transform: translateY(-2px);
+}
+
+/* Settings Button - Info Action */
+.settings-button {
+    background-color: #5c6ac4 !important;
+    color: white !important;
+    text-decoration: none !important;
+}
+
+.settings-button:hover {
+    background-color: #4655b3 !important;
+    transform: translateY(-2px);
+    text-decoration: none !important;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .local-buttons {
+        flex-direction: column;
+    }
+    
+    .local-buttons .action-button {
+        width: 100% !important;
+    }
 }
 
 /* Settings Boxes */
@@ -495,15 +588,164 @@
 }
 
 
-/* Block Item Styles */
+/* Block Components */
 .block-item {
     background: white;
     border: 1px solid #e2e8f0;
     border-radius: 8px;
     margin-bottom: 1rem;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
+/* Block Header */
+.block-header {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e2e8f0;
+    cursor: pointer;
+    margin: 0;
+    border-radius: 8px 8px 0 0;
+}
+
+.block-header.ui-accordion-header {
+    border: none;
+    background: #f8f9fa;
+}
+
+.block-header .ui-accordion-header-icon {
+    display: none;
+}
+
+.block-header-content {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 10px;
+}
+
+/* Block Content Area */
+.block-content {
+    padding: 20px;
+    background: #fff;
+    border-radius: 0 0 8px 8px;
+}
+
+.block-content.ui-accordion-content {
+    border: none;
+    padding: 20px;
+}
+
+/* Form Elements */
+.block-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.block-field {
+    flex: 1;
+    min-width: 0;
+}
+
+.block-field label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #4a5568;
+}
+
+.block-field select,
+.block-field input[type="text"],
+.block-field textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    background-color: #fff;
+    line-height: 1.4;
+}
+
+.block-field select,
+.block-field input[type="text"] {
+    height: 36px;
+}
+
+.block-field textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+.block-field select:disabled,
+.block-field input[type="text"]:disabled,
+.block-field textarea:disabled {
+    background-color: #f8f9fa;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+/* Checkbox Styling */
+.block-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 24px;
+}
+
+.block-checkbox input[type="checkbox"] {
+    margin: 0;
+}
+
+.block-checkbox label {
+    margin: 0;
+    font-weight: normal;
+    cursor: pointer;
+}
+
+/* Block Type Specific Sections */
+.content-block,
+.html-block,
+.wysiwyg-block {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid #e2e8f0;
+}
+
+/* Posts List */
+.block-posts {
+    margin-top: 15px;
+}
+
+.block-posts h4 {
+    margin: 0 0 10px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.sortable-posts {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.sortable-posts li {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    background: #f8f9fa;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 5px;
+    border-radius: 4px;
+}
+
+/* WYSIWYG Editor */
+.wysiwyg-block .wp-editor-wrap {
+    margin-top: 10px;
+}
+
+/* Loading State */
 .block-posts.loading {
     opacity: 0.5;
     pointer-events: none;
@@ -529,69 +771,297 @@
     100% { transform: translate(-50%, -50%) rotate(360deg); }
 }
 
-.block-header {
-    position: relative;
-    padding: 15px;
-    background: #f8f9fa;
-    border-bottom: 1px solid #e2e8f0;
-    cursor: pointer;
-    margin: 0;
-}
-
-.block-drag-handle {
-    cursor: move;
-    margin-right: 10px;
-}
-
-.block-accordion-toggle {
-    position: absolute;
-    right: 15px;
-    top: 50%;
-    transform: translateY(-50%);
-}
-
-.block-title {
-    display: inline-block;
-    margin-left: 10px;
-    font-weight: normal;
-}
-
-.block-content {
-    padding: 20px;
-    background: #fff;
-    border-bottom-left-radius: 8px;
-    border-bottom-right-radius: 8px;
-}
-
-/* Post List Styles */
-.sortable-posts {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-}
-
-.sortable-posts li {
-    display: flex;
-    align-items: center;
-    padding: 10px;
-    background: #f8f9fa;
-    border: 1px solid #e2e8f0;
-    margin-bottom: 5px;
-    border-radius: 4px;
-}
-
+/* Handle Icons */
+.block-drag-handle,
 .story-drag-handle {
     cursor: move;
     color: #718096;
 }
 
-.newsletter-status.schedule {
-    background: #28a745;
+/* Remove Block Button */
+.remove-block {
+    margin-top: 20px;
+    padding: 8px 16px;
+    color: #dc3545;
+    border-color: #dc3545;
+    background: transparent;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.remove-block:hover {
+    background-color: #dc3545;
     color: #fff;
-    padding: 4px 8px;
-    border-radius: 3px;
-    font-size: 12px;
+}
+
+/* Post Thumbnails */
+.post-thumbnail {
+    width: 50px;
+    height: 50px;
+    object-fit: cover;
+    margin-right: 10px;
+    border-radius: 4px;
+}
+
+/* Story Item */
+.story-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    margin-bottom: 5px;
+}
+
+.story-item label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    margin: 0;
+    cursor: pointer;
+}
+
+/* Block Title */
+.block-title {
+    flex: 1;
+    font-size: 14px;
+    font-weight: normal;
+    margin: 0;
+    color: #2d3748;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .block-row {
+        flex-direction: column;
+    }
+    
+    .block-field {
+        width: 100%;
+    }
+    
+    .block-checkbox {
+        margin-top: 10px;
+    }
+}
+
+/* Action Buttons */
+.action-button {
+    height: 60px !important;
+    width: 100% !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px !important;
+    padding: 0 20px !important;
+    margin: 0 !important;
+    gap: 10px;
+    border-radius: 8px;
     font-weight: bold;
-    display: inline-block;
-    vertical-align: middle;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none !important;
+}
+
+.action-button:hover {
+    transform: translateY(-2px);
+}
+
+.button-icon {
+    font-size: 24px;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Specific Button Styles */
+.pdf-button {
+    background-color: #0073aa !important;
+    border-color: #0073aa !important;
+}
+
+.settings-button {
+    background-color: #28a745 !important;
+    border-color: #28a745 !important;
+}
+
+#send-now.send-now-confirmed {
+    background-color: #2ecc71 !important;
+    border-color: #2ecc71 !important;
+}
+
+/* Button Groups */
+.button-group {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.buttons {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.local-buttons {
+    margin-top: 20px;
+    display: flex;
+    gap: 10px;
+}
+
+.local-buttons .action-button {
+    width: 50% !important;
+}
+
+/* Utility Classes */
+.hidden {
+    display: none !important;
+}
+
+/* Messages */
+.no-posts-message {
+    color: #666;
+    font-style: italic;
+    margin: 10px 0;
+}
+
+/* Post Title */
+.post-title {
+    flex: 1;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+/* Block HTML Editor */
+.block-html {
+    width: 100%;
+    min-height: 150px;
+    font-family: monospace;
+    padding: 10px;
+    line-height: 1.4;
+}
+
+/* WYSIWYG Editor Customizations */
+.wysiwyg-block .wp-editor-container {
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.wysiwyg-block .wp-editor-tools {
+    padding: 8px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.wysiwyg-block .wp-editor-area {
+    border: none;
+    padding: 10px;
+}
+
+.wysiwyg-block .wp-switch-editor {
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 4px 12px;
+    margin: 0 4px;
+    background: #fff;
+}
+
+.wysiwyg-block .switch-tmce.active,
+.wysiwyg-block .switch-html.active {
+    background: #0073aa;
+    color: #fff;
+    border-color: #0073aa;
+}
+
+/* Add Block Button */
+#add-block {
+    height: 60px !important;
+    width: 100% !important;
+    display: flex !important;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px !important;
+    padding: 0 20px !important;
+    margin: 20px 0 !important;
+    gap: 10px;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background-color: #2271b1 !important;
+    border: none !important;
+    color: white !important;
+}
+
+#add-block:hover {
+    background-color: #135e96 !important;
+    transform: translateY(-2px);
+}
+
+/* Remove Block Button */
+.remove-button {
+    margin-top: 20px !important;
+    background-color: #dc3545 !important;
+    color: white !important;
+}
+
+.remove-button:hover {
+    background-color: #c82333 !important;
+}
+
+/* Button Colors */
+.save-button {
+    background-color: #2271b1 !important;
+    color: white !important;
+}
+
+.save-button:hover {
+    background-color: #135e96 !important;
+}
+
+.reset-button {
+    background-color: #f0ad4e !important;
+    color: white !important;
+}
+
+.reset-button:hover {
+    background-color: #ec971f !important;
+}
+
+.pdf-button {
+    background-color: #28a745 !important;
+    color: white !important;
+}
+
+.pdf-button:hover {
+    background-color: #218838 !important;
+}
+
+.settings-button {
+    background-color: #5c6ac4 !important;
+    color: white !important;
+}
+
+.settings-button:hover {
+    background-color: #4655b3 !important;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .local-buttons {
+        flex-direction: column;
+    }
+    
+    .local-buttons .action-button {
+        width: 100% !important;
+    }
 }

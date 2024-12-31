@@ -76,16 +76,21 @@ if (!function_exists('newsletter_generate_preview_content')) {
         }
 
         $available_templates = get_option('newsletter_templates', []);
-        $custom_header = get_option("newsletter_custom_header_$newsletter_slug", '');
-        $custom_footer = get_option("newsletter_custom_footer_$newsletter_slug", '');
-        
-        $newsletter_html = !empty($custom_header) ? wp_kses_post(wp_unslash($custom_header)) : '';
+        $newsletter_html = '';
+
+        // Add header template if selected
+        $header_template_id = get_option("newsletter_header_template_$newsletter_slug", '');
+        if (!empty($header_template_id) && isset($available_templates[$header_template_id]) && 
+            isset($available_templates[$header_template_id]['html'])) {
+            $newsletter_html .= wp_kses_post($available_templates[$header_template_id]['html']);
+        }
 
         $newsletter_posts = get_newsletter_posts($blocks);
         if (empty($newsletter_posts)) {
             return '<p>Error: No content available for preview</p>';
         }
 
+        // Add content blocks
         foreach ($newsletter_posts as $block_data) {
             $newsletter_html .= '<div class="newsletter-block" style="margin-bottom: 20px;">';
 
@@ -156,8 +161,11 @@ if (!function_exists('newsletter_generate_preview_content')) {
             $newsletter_html .= '</div>';
         }
 
-        if (!empty($custom_footer)) {
-            $newsletter_html .= wp_kses_post(wp_unslash($custom_footer));
+        // Add footer template if selected
+        $footer_template_id = get_option("newsletter_footer_template_$newsletter_slug", '');
+        if (!empty($footer_template_id) && isset($available_templates[$footer_template_id]) && 
+            isset($available_templates[$footer_template_id]['html'])) {
+            $newsletter_html .= wp_kses_post($available_templates[$footer_template_id]['html']);
         }
 
         return $newsletter_html;
@@ -185,11 +193,11 @@ if (!function_exists('newsletter_handle_blocks_form_submission_non_ajax')) {
         if (isset($_POST['subject_line'])) {
             update_option("newsletter_subject_line_$newsletter_slug", sanitize_text_field(wp_unslash($_POST['subject_line'])));
         }
-        if (isset($_POST['custom_header'])) {
-            update_option("newsletter_custom_header_$newsletter_slug", wp_kses_post(wp_unslash($_POST['custom_header'])));
+        if (isset($_POST['header_template'])) {
+            update_option("newsletter_header_template_$newsletter_slug", sanitize_text_field(wp_unslash($_POST['header_template'])));
         }
-        if (isset($_POST['custom_footer'])) {
-            update_option("newsletter_custom_footer_$newsletter_slug", wp_kses_post(wp_unslash($_POST['custom_footer'])));
+        if (isset($_POST['footer_template'])) {
+            update_option("newsletter_footer_template_$newsletter_slug", sanitize_text_field(wp_unslash($_POST['footer_template'])));
         }
     }
 }

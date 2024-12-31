@@ -79,7 +79,9 @@
                 action: 'generate_preview',
                 security: newsletterData.nonceGeneratePreview,
                 newsletter_slug: newsletterData.newsletterSlug,
-                saved_selections: JSON.stringify(blocks)
+                saved_selections: JSON.stringify(blocks),
+                header_template: $('#header_template').val(),
+                footer_template: $('#footer_template').val()
             },
             success: function(response) {
                 if (response.success) {
@@ -111,7 +113,7 @@
         updatePreview('initial_load');
 
         // Set up direct preview updates for certain changes
-        $('#blocks-container').on('change', '.block-type, .block-template', function() {
+        $('#blocks-container, #header_template, #footer_template').on('change', '.block-type, .block-template', function() {
             if (window.newsletterState.isReady) {
                 updatePreview('type_template_change');
             }

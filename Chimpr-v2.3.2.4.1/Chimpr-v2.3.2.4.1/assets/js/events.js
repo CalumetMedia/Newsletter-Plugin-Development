@@ -54,12 +54,37 @@ $(document).off('click', '.remove-block').on('click', '.remove-block', function(
 $(document).off('click', '#reset-blocks').on('click', '#reset-blocks', function() {
     $('.block-item').each(function() {
         var block = $(this);
-        var categoryId = block.find('.block-category').val();
-        var storyCount = block.find('.block-story-count').val();
-        if (categoryId) {
-            loadBlockPosts(block, categoryId, block.data('index'), 7, storyCount);
+        var blockType = block.find('.block-type').val();
+
+        // Handle WYSIWYG Editor Block
+        if (blockType === 'wysiwyg') {
+            // Uncheck Show Title if checked
+            var showTitleCheckbox = block.find('.show-title-toggle');
+            if (showTitleCheckbox.prop('checked')) {
+                showTitleCheckbox.prop('checked', false);
+            }
+            
+            // Clear editor content
+            var editorId = block.find('.wysiwyg-editor-content').attr('id');
+            if (editorId && tinymce.get(editorId)) {
+                tinymce.get(editorId).setContent('');
+                tinymce.get(editorId).save();
+            }
         }
+        // Handle Content Block
+        else if (blockType === 'content') {
+            // Uncheck manual override if checked
+            var manualOverride = block.find('input[name*="[manual_override]"]');
+            if (manualOverride.prop('checked')) {
+                manualOverride.prop('checked', false);
+                handleManualOverrideToggle(block, false);
+            }
+        }
+        // HTML and PDF blocks - do nothing
     });
+    
+    // Update preview after all changes
+    updatePreview('reset_blocks');
 });
 
 // Story count change

@@ -1,99 +1,86 @@
 <?php
-if (!defined('ABSPATH')) exit;
+// Ensure variables are set
+$index = isset($index) ? $index : 0;
+$block = isset($block) ? $block : [];
 
-if (!isset($block) || !isset($index)) return;
-
-$available_templates = get_option('newsletter_templates', []);
-$block_templates = array_filter($available_templates, function($template) {
-    return isset($template['type']) && $template['type'] === 'block';
-});
-
-if (!isset($block_templates['default'])) {
-    $default_template_content = get_option('newsletter_default_template', '');
-    $block_templates = array_merge(
-        ['default' => [
-            'name' => __('Default Template', 'newsletter'),
-            'html' => $default_template_content,
-            'type' => 'block'
-        ]],
-        $block_templates
-    );
-}
+// Default values
+$block_title = isset($block['title']) ? $block['title'] : '';
+$block_type = isset($block['type']) ? $block['type'] : 'content';
+$block_category = isset($block['category']) ? $block['category'] : '';
+$block_template = isset($block['template_id']) ? $block['template_id'] : 'default';
+$block_date_range = isset($block['date_range']) ? $block['date_range'] : '7';
+$block_story_count = isset($block['story_count']) ? $block['story_count'] : 'disable';
+$block_manual_override = isset($block['manual_override']) ? $block['manual_override'] : false;
+$block_show_title = isset($block['show_title']) ? $block['show_title'] : false;
 ?>
 
-<div class="block-item" data-index="<?php echo esc_attr($index); ?>">
+<div class="block-item" data-index="<?php echo esc_attr($index); ?>" data-block-index="<?php echo esc_attr($index); ?>">
     <h3 class="block-header">
-        <div style="display: flex; align-items: center; width: 100%;">
+        <div class="block-header-content">
             <span class="dashicons dashicons-sort block-drag-handle"></span>
-            <span class="block-title" style="flex: 1; font-size: 14px; margin: 0 10px;"><?php echo esc_html($block['title'] ?: __('Block', 'newsletter')); ?></span>
-            <!-- Removed the accordion toggle arrow icon here -->
+            <span class="block-title"><?php echo esc_html($block_title ?: __('New Block', 'newsletter')); ?></span>
         </div>
     </h3>
+    
     <div class="block-content">
         <!-- Title Row -->
-<div class="title-row" style="display: flex; align-items: center; margin-bottom: 10px;">
-    <div style="width: 25%;">
-        <label><?php esc_html_e('Block Title:', 'newsletter'); ?></label>
-        <input type="text" 
-               name="blocks[<?php echo esc_attr($index); ?>][title]" 
-               class="block-title-input" 
-               value="<?php echo esc_attr(stripslashes($block['title'])); ?>" 
-               style="width: 100%; height: 36px;" />
-    </div>
-            <div style="margin-left: 15px;">
+        <div class="block-row">
+            <div class="block-field">
+                <label><?php esc_html_e('Block Title:', 'newsletter'); ?></label>
+                <input type="text" name="blocks[<?php echo esc_attr($index); ?>][title]" 
+                       class="block-title-input" value="<?php echo esc_attr($block_title); ?>">
+            </div>
+            <div class="block-checkbox">
                 <label>
-                    <input type="checkbox" 
-                           name="blocks[<?php echo esc_attr($index); ?>][show_title]" 
-                           class="show-title-toggle" 
-                           value="1" 
-                           <?php checked(!isset($block['show_title']) || $block['show_title']); ?>>
+                    <input type="checkbox" name="blocks[<?php echo esc_attr($index); ?>][show_title]" 
+                           class="show-title-toggle" value="1" <?php checked($block_show_title, true); ?>>
                     <?php esc_html_e('Show Title in Preview', 'newsletter'); ?>
                 </label>
             </div>
         </div>
         
         <!-- Block Type and Template Row -->
-        <div style="display: flex; gap: 15px; margin-bottom: 10px;">
-            <div style="width: 200px;">
+        <div class="block-row">
+            <div class="block-field">
                 <label><?php esc_html_e('Block Type:', 'newsletter'); ?></label>
-                <select name="blocks[<?php echo esc_attr($index); ?>][type]" 
-                        class="block-type" 
-                        style="width: 100%; height: 36px; line-height: 1.4; padding: 0 6px;">
-                    <option value="content" <?php selected($block['type'], 'content'); ?>><?php esc_html_e('Content', 'newsletter'); ?></option>
-                    <option value="html" <?php selected($block['type'], 'html'); ?>><?php esc_html_e('HTML', 'newsletter'); ?></option>
-                    <option value="wysiwyg" <?php selected($block['type'], 'wysiwyg'); ?>><?php esc_html_e('WYSIWYG Editor', 'newsletter'); ?></option>
-                    <option value="pdf_link" <?php selected($block['type'], 'pdf_link'); ?>><?php esc_html_e('PDF Link', 'newsletter'); ?></option>
+                <select name="blocks[<?php echo esc_attr($index); ?>][type]" class="block-type">
+                    <option value="content" <?php selected($block_type, 'content'); ?>><?php esc_html_e('Content', 'newsletter'); ?></option>
+                    <option value="html" <?php selected($block_type, 'html'); ?>><?php esc_html_e('HTML', 'newsletter'); ?></option>
+                    <option value="wysiwyg" <?php selected($block_type, 'wysiwyg'); ?>><?php esc_html_e('WYSIWYG Editor', 'newsletter'); ?></option>
+                    <option value="pdf_link" <?php selected($block_type, 'pdf_link'); ?>><?php esc_html_e('PDF Link', 'newsletter'); ?></option>
                 </select>
             </div>
 
-            <div style="width: 200px;" class="category-select">
+            <div class="block-field category-select">
                 <label><?php esc_html_e('Select Category:', 'newsletter'); ?></label>
-                <select name="blocks[<?php echo esc_attr($index); ?>][category]" 
-                        class="block-category" 
-                        style="width: 100%; height: 36px; line-height: 1.4; padding: 0 6px;"
-                        <?php echo ($block['type'] === 'html' || $block['type'] === 'wysiwyg' || $block['type'] === 'pdf_link') ? 'disabled' : ''; ?>>
+                <select name="blocks[<?php echo esc_attr($index); ?>][category]" class="block-category"
+                        <?php echo ($block_type !== 'content') ? 'disabled' : ''; ?>>
                     <option value=""><?php esc_html_e('-- Select Category --', 'newsletter'); ?></option>
                     <?php
-                    if (!empty($all_categories)) {
-                        foreach ($all_categories as $category) {
-                            $selected = (isset($block['category']) && $block['category'] == $category->term_id) ? 'selected' : '';
-                            echo '<option value="' . esc_attr($category->term_id) . '" ' . $selected . '>' . esc_html($category->name) . '</option>';
-                        }
+                    foreach ($all_categories as $category) {
+                        printf(
+                            '<option value="%s" %s>%s</option>',
+                            esc_attr($category->term_id),
+                            selected($block_category, $category->term_id, false),
+                            esc_html($category->name)
+                        );
                     }
                     ?>
                 </select>
             </div>
-    
-            <div style="width: 200px;" class="template-select">
+
+            <div class="block-field template-select">
                 <label><?php esc_html_e('Template:', 'newsletter'); ?></label>
-                <select name="blocks[<?php echo esc_attr($index); ?>][template_id]" 
-                        class="block-template" 
-                        style="width: 100%; height: 36px; line-height: 1.4; padding: 0 6px;"
-                        <?php echo ($block['type'] === 'html' || $block['type'] === 'wysiwyg') ? 'disabled' : ''; ?>>
+                <select name="blocks[<?php echo esc_attr($index); ?>][template_id]" class="block-template"
+                        <?php echo ($block_type !== 'content') ? 'disabled' : ''; ?>>
                     <?php
-                    foreach ($block_templates as $tid => $template) {
-                        $selected = (isset($block['template_id']) && $block['template_id'] == $tid) ? 'selected' : '';
-                        echo '<option value="' . esc_attr($tid) . '" ' . $selected . '>' . esc_html($template['name']) . '</option>';
+                    foreach ($available_templates as $template_id => $template) {
+                        printf(
+                            '<option value="%s" %s>%s</option>',
+                            esc_attr($template_id),
+                            selected($block_template, $template_id, false),
+                            esc_html($template['name'])
+                        );
                     }
                     ?>
                 </select>
@@ -101,192 +88,130 @@ if (!isset($block_templates['default'])) {
         </div>
 
         <!-- Date Range and Story Count Row -->
-        <div class="date-range-row" style="display: flex; gap: 15px; margin-bottom: 10px;">
-            <div>
+        <div class="block-row">
+            <div class="block-field">
                 <label><?php esc_html_e('Date Range:', 'newsletter'); ?></label>
-                <select name="blocks[<?php echo esc_attr($index); ?>][date_range]" 
-                        class="block-date-range" 
-                        style="width: 200px; height: 36px; line-height: 1.4; padding: 0 6px;"
-                        <?php echo ($block['type'] === 'html' || $block['type'] === 'wysiwyg' || $block['type'] === 'pdf_link') ? 'disabled' : ''; ?>>
-                    <option value="1" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 1); ?>><?php esc_html_e('Previous 1 Day', 'newsletter'); ?></option>
-                    <option value="2" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 2); ?>><?php esc_html_e('Previous 2 Days', 'newsletter'); ?></option>
-                    <option value="3" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 3); ?>><?php esc_html_e('Previous 3 Days', 'newsletter'); ?></option>
-                    <option value="5" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 5); ?>><?php esc_html_e('Previous 5 Days', 'newsletter'); ?></option>
-                    <option value="7" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 7); ?>><?php esc_html_e('Previous 7 Days', 'newsletter'); ?></option>
-                    <option value="14" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 14); ?>><?php esc_html_e('Previous 14 Days', 'newsletter'); ?></option>
-                    <option value="30" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 30); ?>><?php esc_html_e('Previous 30 Days', 'newsletter'); ?></option>
-                    <option value="60" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 60); ?>><?php esc_html_e('Previous 60 Days', 'newsletter'); ?></option>
-                    <option value="90" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 90); ?>><?php esc_html_e('Previous 90 Days', 'newsletter'); ?></option>
-                    <option value="0" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 0); ?>><?php esc_html_e('All', 'newsletter'); ?></option>
+                <select name="blocks[<?php echo esc_attr($index); ?>][date_range]" class="block-date-range"
+                        <?php echo ($block_type !== 'content') ? 'disabled' : ''; ?>>
+                    <?php
+                    $date_ranges = [
+                        '1' => __('Previous 1 Day', 'newsletter'),
+                        '2' => __('Previous 2 Days', 'newsletter'),
+                        '3' => __('Previous 3 Days', 'newsletter'),
+                        '5' => __('Previous 5 Days', 'newsletter'),
+                        '7' => __('Previous 7 Days', 'newsletter'),
+                        '14' => __('Previous 14 Days', 'newsletter'),
+                        '30' => __('Previous 30 Days', 'newsletter'),
+                        '60' => __('Previous 60 Days', 'newsletter'),
+                        '90' => __('Previous 90 Days', 'newsletter'),
+                        '0' => __('All', 'newsletter'),
+                    ];
+
+                    foreach ($date_ranges as $value => $label) {
+                        printf(
+                            '<option value="%s" %s>%s</option>',
+                            esc_attr($value),
+                            selected($block_date_range, $value, false),
+                            esc_html($label)
+                        );
+                    }
+                    ?>
                 </select>
             </div>
 
-            <div>
-                <?php $current_story_count = isset($block['story_count']) ? $block['story_count'] : 'disable'; ?>
+            <div class="block-field">
                 <label><?php esc_html_e('Number of Stories:', 'newsletter'); ?></label>
-                <select name="blocks[<?php echo esc_attr($index); ?>][story_count]" 
-                        class="block-story-count" 
-                        style="width: 200px; height: 36px; line-height: 1.4; padding: 0 6px;"
+                <select name="blocks[<?php echo esc_attr($index); ?>][story_count]" class="block-story-count"
                         data-block-index="<?php echo esc_attr($index); ?>"
-                        <?php echo ($block['type'] === 'html' || $block['type'] === 'wysiwyg' || $block['type'] === 'pdf_link') ? 'disabled' : ''; ?>>
-                    <option value="disable" <?php selected($current_story_count, 'disable'); ?>><?php esc_html_e('All', 'newsletter'); ?></option>
-                    <?php for ($i = 1; $i <= 10; $i++) : ?>
-                        <option value="<?php echo $i; ?>" <?php selected($current_story_count, $i); ?>><?php echo $i; ?></option>
-                    <?php endfor; ?>
+                        <?php echo ($block_type !== 'content') ? 'disabled' : ''; ?>>
+                    <option value="disable" <?php selected($block_story_count, 'disable'); ?>><?php esc_html_e('All', 'newsletter'); ?></option>
+                    <?php
+                    for ($i = 1; $i <= 10; $i++) {
+                        printf(
+                            '<option value="%d" %s>%d</option>',
+                            $i,
+                            selected($block_story_count, $i, false),
+                            $i
+                        );
+                    }
+                    ?>
                 </select>
             </div>
 
-            <div style="display: flex; align-items: flex-end; padding-bottom: 8px;">
+            <div class="block-checkbox">
                 <label>
-                    <input type="checkbox" 
-                           name="blocks[<?php echo esc_attr($index); ?>][manual_override]" 
-                           class="manual-override-toggle" 
-                           value="1" 
-                           <?php checked(isset($block['manual_override']) && $block['manual_override']); ?>
-                           <?php echo ($block['type'] === 'html' || $block['type'] === 'wysiwyg' || $block['type'] === 'pdf_link') ? 'disabled' : ''; ?>>
+                    <input type="checkbox" name="blocks[<?php echo esc_attr($index); ?>][manual_override]"
+                           class="manual-override-toggle" value="1"
+                           <?php checked($block_manual_override, true); ?>
+                           <?php echo ($block_type !== 'content') ? 'disabled' : ''; ?>>
                     <?php esc_html_e('Manual Override Stories', 'newsletter'); ?>
                 </label>
             </div>
         </div>
 
         <!-- Content Block Section -->
-        <div class="content-block" <?php if ($block['type'] !== 'content') echo 'style="display:none;"'; ?>>
-            <!-- Posts Selection Section -->
+        <div class="content-block<?php echo ($block_type !== 'content') ? ' hidden' : ''; ?>">
             <div class="block-posts">
                 <h4><?php esc_html_e('Posts:', 'newsletter'); ?></h4>
-                <?php
-                if (!empty($block['category'])) {
-                    $posts_args = [
-                        'post_type'   => 'post',
-                        'category'    => $block['category'],
-                        'numberposts' => 20,
-                        'orderby'     => 'date',
-                        'order'       => 'DESC',
-                        'post_status' => 'publish'
-                    ];
-
-                    $posts = get_posts($posts_args);
-
-                    if ($posts) {
-                        $selected_posts = isset($block['posts']) ? $block['posts'] : [];
-                        usort($posts, function ($a, $b) use ($selected_posts) {
-                            $order_a = isset($selected_posts[$a->ID]['order']) ? intval($selected_posts[$a->ID]['order']) : PHP_INT_MAX;
-                            $order_b = isset($selected_posts[$b->ID]['order']) ? intval($selected_posts[$b->ID]['order']) : PHP_INT_MAX;
-                            return $order_a - $order_b;
-                        });
-                        echo '<ul class="sortable-posts">';
-                        $post_counter = 0;
-                        foreach ($posts as $post) {
-                            $post_counter++;
-                            $post_id = $post->ID;
-                            $checked = isset($selected_posts[$post_id]['checked']) ? 'checked' : '';
-                            if (!isset($block['manual_override']) || !$block['manual_override']) {
-                                // When not in manual mode, check based on story count
-                                $story_count = isset($block['story_count']) && $block['story_count'] !== 'disable' ? intval($block['story_count']) : PHP_INT_MAX;
-                                $checked = $post_counter <= $story_count ? 'checked' : '';
-                            }
-                            $thumbnail_url = get_the_post_thumbnail_url($post_id, 'thumbnail') ?: '';
-                            $order = isset($selected_posts[$post_id]['order']) ? intval($selected_posts[$post_id]['order']) : $post_counter;
-                            ?>
-                            <li data-post-id="<?php echo esc_attr($post_id); ?>" class="story-item">
-                                <span class="dashicons dashicons-sort story-drag-handle" style="cursor: move; margin-right: 10px;"></span>
+                <?php if (empty($block_category)): ?>
+                    <p class="no-posts-message"><?php esc_html_e('Please select a category to display posts.', 'newsletter'); ?></p>
+                <?php endif; ?>
+                <?php if (!empty($block['posts'])): ?>
+                    <ul class="sortable-posts">
+                        <?php foreach ($block['posts'] as $post): ?>
+                            <li class="story-item" data-post-id="<?php echo esc_attr($post['ID']); ?>">
+                                <span class="dashicons dashicons-sort story-drag-handle"></span>
                                 <label>
-                                    <input type="checkbox" 
-                                           name="blocks[<?php echo esc_attr($index); ?>][posts][<?php echo esc_attr($post_id); ?>][checked]" 
-                                           value="1" 
-                                           <?php echo $checked; ?>>
-                                    <?php if ($thumbnail_url): ?>
-                                        <img src="<?php echo esc_url($thumbnail_url); ?>" alt="<?php echo esc_attr($post->post_title); ?>" style="width:50px; height:auto; margin-right:10px; vertical-align: middle;">
+                                    <input type="checkbox" name="blocks[<?php echo esc_attr($index); ?>][posts][<?php echo esc_attr($post['ID']); ?>][checked]" 
+                                           value="1" <?php checked(isset($post['checked']), true); ?>>
+                                    <?php if (!empty($post['thumbnail'])): ?>
+                                        <img class="post-thumbnail" src="<?php echo esc_url($post['thumbnail']); ?>" 
+                                             alt="<?php echo esc_attr($post['title']); ?>">
                                     <?php endif; ?>
-                                    <?php echo esc_html($post->post_title); ?>
+                                    <span class="post-title"><?php echo esc_html($post['title']); ?></span>
                                 </label>
-                                <input type="hidden" class="post-order" name="blocks[<?php echo esc_attr($index); ?>][posts][<?php echo esc_attr($post_id); ?>][order]" value="<?php echo esc_attr($order); ?>">
+                                <input type="hidden" class="post-order" 
+                                       name="blocks[<?php echo esc_attr($index); ?>][posts][<?php echo esc_attr($post['ID']); ?>][order]" 
+                                       value="<?php echo esc_attr($post['order'] ?? ''); ?>">
                             </li>
-                            <?php
-                        }
-                        echo '</ul>';
-                    } else {
-                        echo '<p>' . esc_html__('No posts found in this category.', 'newsletter') . '</p>';
-                    }
-                } else {
-                    echo '<p>' . esc_html__('Please select a category to display posts.', 'newsletter') . '</p>';
-                }
-                ?>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
             </div>
         </div>
 
         <!-- HTML Block Section -->
-        <div class="html-block" <?php if ($block['type'] !== 'html') echo 'style="display:none;"'; ?>>
-            <label><?php esc_html_e('Custom HTML:', 'newsletter'); ?></label>
-            <textarea name="blocks[<?php echo esc_attr($index); ?>][html]" rows="5" style="width:100%;"><?php echo isset($block['html']) ? esc_textarea($block['html']) : ''; ?></textarea>
+        <div class="html-block<?php echo ($block_type !== 'html') ? ' hidden' : ''; ?>">
+            <div class="block-field">
+                <label><?php esc_html_e('Custom HTML:', 'newsletter'); ?></label>
+                <textarea name="blocks[<?php echo esc_attr($index); ?>][html]" rows="5" 
+                          class="block-html"><?php echo esc_textarea($block['html'] ?? ''); ?></textarea>
+            </div>
         </div>
 
         <!-- WYSIWYG Block -->
-        <div class="wysiwyg-block" <?php if ($block['type'] !== 'wysiwyg') echo 'style="display:none;"'; ?>>
-            <label><?php esc_html_e('WYSIWYG Content:', 'newsletter'); ?></label>
-            <?php
-            $editor_id = 'wysiwyg-editor-' . $index;
-            $wysiwyg_content = isset($block['wysiwyg']) ? wp_kses_post($block['wysiwyg']) : '';
-            
-            // Store the original content in a hidden field for comparison
-            echo '<input type="hidden" id="' . esc_attr($editor_id) . '-original" value="' . esc_attr($wysiwyg_content) . '">';
-            
-            if ($block['type'] === 'wysiwyg') {
-                wp_editor(
-                    $wysiwyg_content,
-                    $editor_id,
-                    array(
-                        'textarea_name' => 'blocks[' . esc_attr($index) . '][wysiwyg]',
-                        'media_buttons' => true,
-                        'textarea_rows' => 15,
-                        'editor_class' => 'wysiwyg-editor-content',
-                        'tinymce' => array(
-                            'wpautop' => true,
-                            'plugins' => 'paste,lists,link,textcolor,wordpress,wplink,hr,charmap,wptextpattern',
-                            'toolbar1' => 'formatselect,bold,italic,bullist,numlist,link,unlink,forecolor,hr',
-                            'init_instance_callback' => "function(editor) {
-                                editor.on('change keyup NodeChange SetContent', function() {
-                                    editor.save();
-                                    var content = editor.getContent();
-                                    var originalContent = jQuery('#' + editor.id + '-original').val();
-                                    
-                                    // Only trigger change if content has actually changed
-                                    if (content !== originalContent) {
-                                        jQuery('#' + editor.id + '-original').val(content);
-                                        jQuery(editor.getElement()).trigger('change');
-                                    }
-                                });
-                                
-                                editor.on('blur', function() {
-                                    editor.save();
-                                });
-                            }",
-                            'setup' => "function(editor) {
-                                editor.on('init', function() {
-                                    var content = editor.getContent();
-                                    jQuery('#' + editor.id + '-original').val(content);
-                                });
-                                
-                                editor.on('BeforeSetContent', function(e) {
-                                    if (e.content === '' || e.content === '<p></p>') {
-                                        var originalContent = jQuery('#' + editor.id + '-original').val();
-                                        if (originalContent) {
-                                            e.content = originalContent;
-                                        }
-                                    }
-                                });
-                            }"
-                        ),
-                        'quicktags' => true
-                    )
-                );
-            } else {
-                // If not a WYSIWYG block, just output a hidden textarea to store the content
-                echo '<textarea id="' . esc_attr($editor_id) . '" name="blocks[' . esc_attr($index) . '][wysiwyg]" style="display:none;">' . esc_textarea($wysiwyg_content) . '</textarea>';
-            }
-            ?>
+        <div class="wysiwyg-block<?php echo ($block_type !== 'wysiwyg') ? ' hidden' : ''; ?>">
+            <div class="block-field">
+                <label><?php esc_html_e('WYSIWYG Content:', 'newsletter'); ?></label>
+                <?php
+                $editor_content = isset($block['wysiwyg']) ? $block['wysiwyg'] : '';
+                $editor_id = 'wysiwyg-editor-' . $index;
+                wp_editor($editor_content, $editor_id, [
+                    'textarea_name' => "blocks[$index][wysiwyg]",
+                    'textarea_rows' => 15,
+                    'media_buttons' => true,
+                    'teeny' => true,
+                    'quicktags' => true,
+                ]);
+                ?>
+            </div>
         </div>
 
-        <button type="button" class="button remove-block"><?php esc_html_e('Remove Block', 'newsletter'); ?></button>
+        <button type="button" 
+                class="button button-large action-button remove-button block-remove-btn" 
+                data-block-index="<?php echo esc_attr($index); ?>">
+            <span class="dashicons dashicons-trash button-icon"></span>
+            <strong><?php esc_html_e('REMOVE BLOCK', 'newsletter'); ?></strong>
+        </button>
     </div>
 </div>

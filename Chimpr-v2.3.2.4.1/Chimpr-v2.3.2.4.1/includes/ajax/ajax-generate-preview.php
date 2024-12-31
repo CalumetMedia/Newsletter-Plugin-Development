@@ -41,6 +41,20 @@ function newsletter_generate_preview() {
             return;
         }
 
+        // Update template selections if provided
+        if (isset($_POST['header_template'])) {
+            update_option(
+                "newsletter_header_template_$newsletter_slug",
+                sanitize_text_field(wp_unslash($_POST['header_template']))
+            );
+        }
+        if (isset($_POST['footer_template'])) {
+            update_option(
+                "newsletter_footer_template_$newsletter_slug",
+                sanitize_text_field(wp_unslash($_POST['footer_template']))
+            );
+        }
+
         // Validate and decode saved selections
         $saved_selections = [];
         if (isset($_POST['saved_selections'])) {

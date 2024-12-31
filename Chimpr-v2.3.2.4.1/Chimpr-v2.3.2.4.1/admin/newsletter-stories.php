@@ -143,6 +143,10 @@ if (!empty($send_days) && !empty($send_time)) {
 // Enqueue admin JS
 wp_enqueue_script('newsletter-admin-js', NEWSLETTER_PLUGIN_URL . 'assets/js/newsletter-admin.js', ['jquery', 'jquery-ui-datepicker', 'jquery-ui-accordion', 'jquery-ui-sortable'], '1.0', true);
 
+// Enqueue CSS files
+wp_enqueue_style('newsletter-admin', NEWSLETTER_PLUGIN_URL . 'assets/css/newsletter-admin.css', [], '1.0');
+wp_enqueue_style('newsletter-stories', NEWSLETTER_PLUGIN_URL . 'assets/css/newsletter-stories.css', ['newsletter-admin'], '1.0');
+
 // Prepare categories for JS
 $categories_data = [];
 if (!empty($all_categories)) {
@@ -201,108 +205,88 @@ wp_localize_script('newsletter-admin-js', 'newsletterData', [
 
                 <div class="settings-and-buttons">
                     <div class="campaign-settings">
-                        <h2 class="nav-tab-wrapper">
-                            <a href="#campaign-settings" class="nav-tab nav-tab-active" data-tab="campaign-settings"><?php esc_html_e('Campaign Settings', 'newsletter'); ?></a>
-                            <a href="#tag-targeting" class="nav-tab" data-tab="tag-targeting"><?php esc_html_e('Tag Targeting', 'newsletter'); ?></a>
-                            <a href="#header-html" class="nav-tab" data-tab="header-html"><?php esc_html_e('Header HTML', 'newsletter'); ?></a>
-                            <a href="#footer-html" class="nav-tab" data-tab="footer-html"><?php esc_html_e('Footer HTML', 'newsletter'); ?></a>
-                        </h2>
-
-                        <!-- Campaign Settings Tab -->
-                        <div id="campaign-settings" class="tab-content active">
-                            <table class="form-table">
-                                <tr>
-                                    <th scope="row"><?php esc_html_e('Campaign Name', 'newsletter'); ?></th>
-                                    <td>
-                                        <span><?php echo esc_html($newsletter_name . ' - ' . $send_date_display); ?></span>
-                                        <span class="tooltip-icon" title="<?php esc_attr_e('This campaign name is automatically generated based on your set days and times.', 'newsletter'); ?>">
-                                            <span class="dashicons dashicons-info"></span>
-                                        </span>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <th scope="row"><label for="subject_line"><?php esc_html_e('Subject Line', 'newsletter'); ?></label></th>
-                                    <td><input type="text" id="subject_line" name="subject_line" class="regular-text" value="<?php echo esc_attr(get_option("newsletter_subject_line_$newsletter_slug", '')); ?>"></td>
-                                </tr>
-                                <?php
-                                if (!empty($next_scheduled_text)) {
-                                    echo $next_scheduled_text;
-                                }
-                                ?>
-                            </table>
-                        </div>
-
-                        <!-- Tag Targeting Tab Content -->
-                        <div id="tag-targeting" class="tab-content">
-                            <table class="form-table">
-                                <tr>
-                                    <th scope="row"><?php esc_html_e('Target Tags', 'newsletter'); ?></th>
-                                    <td>
+                        <table class="form-table">
+                            <tr>
+                                <th scope="row"><?php esc_html_e('Campaign Name', 'newsletter'); ?></th>
+                                <td>
+                                    <span><?php echo esc_html($newsletter_name . ' - ' . $send_date_display); ?></span>
+                                    <span class="tooltip-icon" title="<?php esc_attr_e('This campaign name is automatically generated based on your set days and times.', 'newsletter'); ?>">
+                                        <span class="dashicons dashicons-info"></span>
+                                    </span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row"><label for="subject_line"><?php esc_html_e('Subject Line', 'newsletter'); ?></label></th>
+                                <td><input type="text" id="subject_line" name="subject_line" class="regular-text" value="<?php echo esc_attr(get_option("newsletter_subject_line_$newsletter_slug", '')); ?>"></td>
+                            </tr>
+                            <tr>
+                                <th scope="row"><label for="header_template"><?php esc_html_e('Header Template', 'newsletter'); ?></label></th>
+                                <td>
+                                    <select name="header_template" id="header_template" class="regular-text">
+                                        <option value=""><?php esc_html_e('-- Select Header Template --', 'newsletter'); ?></option>
                                         <?php
-                                        $mailchimp = new Newsletter_Mailchimp_API();
-                                        $list_id = get_option('mailchimp_list_id');
-                                        $tags_response = $mailchimp->get_list_tags($list_id);
-                                        $selected_tags = get_option("newsletter_target_tags_$newsletter_slug", []);
-
-                                        if (!is_wp_error($tags_response) && isset($tags_response['tags'])) {
-                                            echo '<select name="target_tags[]" multiple>';
-                                            foreach ($tags_response['tags'] as $tag) {
+                                        $all_templates = get_option('newsletter_templates', []);
+                                        foreach ($all_templates as $id => $template) {
+                                            if (isset($template['type']) && $template['type'] === 'header') {
                                                 printf(
                                                     '<option value="%s" %s>%s</option>',
-                                                    esc_attr($tag['id']),
-                                                    selected(in_array($tag['id'], $selected_tags), true, false),
-                                                    esc_html($tag['name'])
+                                                    esc_attr($id),
+                                                    selected(get_option("newsletter_header_template_$newsletter_slug", ''), $id, false),
+                                                    esc_html($template['name'])
                                                 );
                                             }
-                                            echo '</select>';
                                         }
                                         ?>
-                                    </td>
-                                </tr>
-                            </table>
-                        </div>
-
-                        <!-- Header HTML Tab -->
-                        <div id="header-html" class="tab-content">
-                            <table class="form-table">
-                                <tr>
-                                    <td colspan="2">
-                                        <textarea id="custom_header" name="custom_header" rows="10" class="large-text"><?php echo esc_textarea(get_option("newsletter_custom_header_$newsletter_slug", '')); ?></textarea>
-                                    </td>
-                                </tr>
-                            </table>
-                        </div>
-
-                        <!-- Footer HTML Tab -->
-                        <div id="footer-html" class="tab-content">
-                            <table class="form-table">
-                                <tr>
-                                    <td colspan="2">
-                                        <textarea id="custom_footer" name="custom_footer" rows="10" class="large-text"><?php echo esc_textarea(get_option("newsletter_custom_footer_$newsletter_slug", '')); ?></textarea>
-                                    </td>
-                                </tr>
-                            </table>
-                        </div>
+                                    </select>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th scope="row"><label for="footer_template"><?php esc_html_e('Footer Template', 'newsletter'); ?></label></th>
+                                <td>
+                                    <select name="footer_template" id="footer_template" class="regular-text">
+                                        <option value=""><?php esc_html_e('-- Select Footer Template --', 'newsletter'); ?></option>
+                                        <?php
+                                        foreach ($all_templates as $id => $template) {
+                                            if (isset($template['type']) && $template['type'] === 'footer') {
+                                                printf(
+                                                    '<option value="%s" %s>%s</option>',
+                                                    esc_attr($id),
+                                                    selected(get_option("newsletter_footer_template_$newsletter_slug", ''), $id, false),
+                                                    esc_html($template['name'])
+                                                );
+                                            }
+                                        }
+                                        ?>
+                                    </select>
+                                </td>
+                            </tr>
+                            <?php
+                            if (!empty($next_scheduled_text)) {
+                                echo $next_scheduled_text;
+                            }
+                            ?>
+                        </table>
 
                         <!-- Local Buttons -->
                         <div class="local-buttons">
-                            <button type="submit" class="button button-primary button-large action-button" id="save-blocks">
+                            <button type="submit" class="button button-large action-button save-button" id="save-blocks">
+                                <span class="dashicons dashicons-cloud-saved button-icon"></span>
                                 <strong><?php esc_html_e('SAVE', 'newsletter'); ?></strong>
                             </button>
 
-                            <button type="button" class="button button-large action-button" id="reset-blocks">
+                            <button type="button" class="button button-large action-button reset-button" id="reset-blocks">
+                                <span class="dashicons dashicons-image-rotate button-icon"></span>
                                 <strong><?php esc_html_e('RESET', 'newsletter'); ?></strong>
                             </button>
 
-                            <!-- Generate PDF Button -->
-                            <button type="submit" class="button button-large action-button" name="generate_pdf" value="1" id="generate-pdf" style="background-color: #0073aa; color: #fff;" onclick="return confirm('<?php esc_attr_e('Generate PDF now?', 'newsletter'); ?>');">
-                                <span class="dashicons dashicons-pdf" style="vertical-align: middle; margin-right:5px;"></span>
-                                <strong><?php esc_html_e('GENERATE PDF', 'newsletter'); ?></strong>
+                            <button type="submit" class="button button-large action-button pdf-button" name="generate_pdf" value="1" id="generate-pdf" onclick="return confirm('<?php esc_attr_e('Generate PDF now?', 'newsletter'); ?>');">
+                                <span class="dashicons dashicons-media-document button-icon"></span>
+                                <strong><?php esc_html_e('PDF', 'newsletter'); ?></strong>
                             </button>
 
                             <a href="<?php echo esc_url(admin_url('admin.php?page=newsletter-settings&tab=' . $newsletter_slug)); ?>"
-                               class="button button-large action-button" id="settings-button"
-                               style="background-color: #28a745; color: #fff;">
+                               class="button button-large action-button settings-button" id="settings-button">
+                                <span class="dashicons dashicons-admin-generic button-icon"></span>
                                 <strong><?php esc_html_e('SETTINGS', 'newsletter'); ?></strong>
                             </a>
                         </div>
@@ -316,12 +300,12 @@ wp_localize_script('newsletter-admin-js', 'newsletterData', [
                         <div class="button-group">
                             <div class="buttons">
                                 <button type="button" class="button button-large action-button" id="send-test-email">
-                                    <span class="dashicons dashicons-email" style="vertical-align: middle; margin-right:5px;"></span>
+                                    <span class="dashicons dashicons-email button-icon"></span>
                                     <strong><?php esc_html_e('SEND TEST', 'newsletter'); ?></strong>
                                 </button>
 
                                 <button type="button" class="button button-large action-button" id="send-to-mailchimp">
-                                    <span class="dashicons dashicons-edit" style="vertical-align: middle; margin-right:5px;"></span>
+                                    <span class="dashicons dashicons-edit button-icon"></span>
                                     <strong><?php esc_html_e('SEND DRAFT', 'newsletter'); ?></strong>
                                 </button>
 
@@ -331,12 +315,13 @@ wp_localize_script('newsletter-admin-js', 'newsletterData', [
             id="schedule-campaign" 
             data-timestamp="<?php echo esc_attr((int)$next_scheduled_timestamp); ?>"
             data-formatted-time="<?php echo esc_attr(wp_date('F j, Y g:i a', $next_scheduled_timestamp)); ?>">
-        <span class="dashicons dashicons-calendar" style="vertical-align: middle; margin-right:5px;"></span>
+        <span class="dashicons dashicons-calendar button-icon"></span>
         <strong><?php esc_html_e('SCHEDULE', 'newsletter'); ?></strong>
     </button>
 <?php endif; ?> 
-                                <button type="button" class="button button-large action-button schedule-button" id="send-now">
-                                    <span class="dashicons dashicons-megaphone" style="vertical-align: middle; margin-right:5px;"></span>
+
+                                <button type="button" class="button button-large action-button" id="send-now">
+                                    <span class="dashicons dashicons-megaphone button-icon"></span>
                                     <strong><?php esc_html_e('SEND NOW', 'newsletter'); ?></strong>
                                 </button>
                             </div>
@@ -456,6 +441,53 @@ jQuery(document).ready(function($) {
                 sendNowButtonClickedOnce = false;
                 $('#send-now').removeClass('send-now-confirmed');
             }
+        }
+    });
+});
+</script>
+
+<!-- Block Removal Script -->
+<script>
+jQuery(document).ready(function($) {
+    // Handle block removal
+    $(document).on('click', '.block-remove-btn', function() {
+        if ($(this).data('confirmed')) {
+            const blockItem = $(this).closest('.block-item');
+            blockItem.slideUp(300, function() {
+                blockItem.remove();
+                // Update any remaining block indices if needed
+                $('.block-item').each(function(index) {
+                    $(this).attr('data-index', index);
+                    $(this).find('[name^="blocks["]').each(function() {
+                        const name = $(this).attr('name');
+                        $(this).attr('name', name.replace(/blocks\[\d+\]/, 'blocks[' + index + ']'));
+                    });
+                });
+            });
+        } else {
+            const confirmed = confirm('<?php esc_attr_e('Are you sure you want to remove this block?', 'newsletter'); ?>');
+            if (confirmed) {
+                $(this).data('confirmed', true).click();
+            }
+        }
+        return false;
+    });
+});
+</script>
+
+<!-- Reset Button Script -->
+<script>
+jQuery(document).ready(function($) {
+    $('#reset-blocks').on('click', function(e) {
+        e.preventDefault();
+        const confirmed = confirm("Do you want to reset the newsletter to it's default state?");
+        if (confirmed) {
+            const resetInput = $('<input>').attr({
+                type: 'hidden',
+                name: 'reset_blocks',
+                value: '1'
+            });
+            $('#blocks-form').append(resetInput).submit();
         }
     });
 });

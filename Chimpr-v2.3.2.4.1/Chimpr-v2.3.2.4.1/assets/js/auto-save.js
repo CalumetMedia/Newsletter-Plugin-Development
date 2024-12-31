@@ -130,6 +130,9 @@
         formData.append('newsletter_slug', newsletterData.newsletterSlug);
         formData.append('blocks', blocksJson);
         formData.append('is_auto_save', '1');
+        formData.append('header_template', $('#header_template').val());
+        formData.append('footer_template', $('#footer_template').val());
+        formData.append('subject_line', $('#subject_line').val());
 
         // Send AJAX request
         $.ajax({
@@ -204,6 +207,9 @@
         formData.append('newsletter_slug', newsletterData.newsletterSlug);
         formData.append('blocks', blocksJson);
         formData.append('is_auto_save', '0');
+        formData.append('header_template', $('#header_template').val());
+        formData.append('footer_template', $('#footer_template').val());
+        formData.append('subject_line', $('#subject_line').val());
 
         // Send AJAX request
         $.ajax({
@@ -248,10 +254,10 @@
         if (autoSaveInitialized) return;
         autoSaveInitialized = true;
 
-        // Listen for changes on block container
-        $('#blocks-container').on('change', function(event) {
+        // Listen for changes on block container and form fields
+        $('#blocks-container, #header_template, #footer_template, #subject_line').on('change', function(event) {
             const target = event.target;
-            if ($(target).is('.block-type, .block-title-input, .show-title-toggle, .block-template, .block-category, .block-date-range, .block-story-count, input[name*="[manual_override]"], input[name*="[checked]"], .post-order, .html-block textarea, .wysiwyg-editor-content')) {
+            if ($(target).is('.block-type, .block-title-input, .show-title-toggle, .block-template, .block-category, .block-date-range, .block-story-count, input[name*="[manual_override]"], input[name*="[checked]"], .post-order, .html-block textarea, .wysiwyg-editor-content, #header_template, #footer_template, #subject_line')) {
                 debouncedAutoSave();
             }
         });

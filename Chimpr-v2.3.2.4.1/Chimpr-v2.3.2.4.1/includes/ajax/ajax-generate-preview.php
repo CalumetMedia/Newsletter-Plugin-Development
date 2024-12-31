@@ -77,6 +77,25 @@ function newsletter_generate_preview() {
                 $saved_blocks[$block_index]['type'] = 'html';
                 $saved_blocks[$block_index]['html'] = wp_kses_post($block_data['html']);
             }
+
+            // Handle PDF Link content - treat like HTML but pull from template
+            if (isset($block_data['type']) && $block_data['type'] === 'pdf_link') {
+                $saved_blocks[$block_index]['type'] = 'pdf_link';
+                
+                // Get template content if template_id is set
+                if (isset($block_data['template_id'])) {
+                    $available_templates = get_option('newsletter_templates', []);
+                    $template_id = $block_data['template_id'];
+                    
+                    if (isset($available_templates[$template_id])) {
+                        // Store the template content as if it was HTML content
+                        $saved_blocks[$block_index]['html'] = wp_kses_post($available_templates[$template_id]['html']);
+                    } else {
+                        error_log("Template not found for PDF Link block: $template_id");
+                        $saved_blocks[$block_index]['html'] = ''; // Empty if template not found
+                    }
+                }
+            }
             
             // Handle other block data
             foreach (['title', 'show_title', 'template_id', 'category', 'date_range', 'story_count', 'manual_override'] as $field) {
@@ -123,6 +142,12 @@ function newsletter_generate_preview() {
             $final_html .= '.newsletter-preview-container {' . esc_html($custom_css) . '}';
             $final_html .= '</style>';
         }
+        
+        // Add PDF Link specific styles if needed
+        $final_html .= '<style type="text/css">';
+        $final_html .= '.pdf-link-block { /* Add any specific styling for PDF Link blocks */ }';
+        $final_html .= '</style>';
+        
         $final_html .= $preview_html;
         $final_html .= '</div>';
 

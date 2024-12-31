@@ -164,6 +164,13 @@ function newsletter_handle_blocks_form_submission() {
                 error_log("[Block Debug] Sanitized HTML Length: " . strlen($sanitized_block['html']));
             }
 
+            // Handle PDF Link blocks - treat like HTML for now
+            if ($block['type'] === 'pdf_link') {
+                error_log("[Block Debug] Processing PDF Link block - Title: " . (isset($block['title']) ? $block['title'] : 'untitled'));
+                // No content to process yet, just ensure the type is preserved
+                $sanitized_block['type'] = 'pdf_link';
+            }
+
             // Log block before adding to sanitized blocks
             error_log("[Block Debug] Adding block to sanitized_blocks - Type: " . $block['type']);
             error_log("[Block Debug] Block details: " . print_r($sanitized_block, true));

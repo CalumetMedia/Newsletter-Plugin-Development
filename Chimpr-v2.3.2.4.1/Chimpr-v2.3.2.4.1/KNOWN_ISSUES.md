@@ -260,6 +260,47 @@ This is a critical issue affecting template content handling.
 
 **Details**: See `/knowledge-base/2024/12/wysiwyg-display-persistence-issue-20241231-0100.md`
 
+### PDF Link Block Preview Issue (v2.3.2.4.1)
+**Issue**: PDF Link blocks were not displaying in preview and fields remained interactable when they should be disabled.
+**Root Cause**: 
+1. Preview generation was not properly handling PDF Link block types
+2. Block initialization was not properly disabling fields for PDF Link blocks
+3. Template content was not being correctly pulled for preview generation
+
+**Solution**: 
+1. Updated preview generation to handle PDF Link blocks:
+   ```php
+   // Handle PDF Link blocks like HTML blocks in preview
+   if ($block_data['type'] === 'pdf_link' && isset($block_data['html'])) {
+       $newsletter_html .= wp_kses_post(wp_unslash($block_data['html']));
+   }
+   ```
+
+2. Enhanced block initialization:
+   - Properly disable fields for PDF Link blocks
+   - Maintain template field as only active field
+   - Handle field states during save and load
+
+3. Added proper spacing in preview generation:
+   ```php
+   $newsletter_html .= '<div class="newsletter-block" style="margin-bottom: 20px;">';
+   ```
+
+**Critical Implementation Notes**:
+1. Field State Rules:
+   - Template field must remain active
+   - All other fields must be disabled
+   - States must persist through save/load
+   - Manual override must respect block type
+
+2. Preview Generation:
+   - Handle PDF Link blocks like HTML
+   - Pull content from templates
+   - Maintain proper spacing
+   - Preserve block titles
+
+**Details**: See `/knowledge-base/2024/12/pdf-link-preview-issue-20241231-0200.md`
+
 ---
 
 ## Critical Implementation Issues

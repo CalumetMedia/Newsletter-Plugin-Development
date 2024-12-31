@@ -54,6 +54,8 @@ if (!function_exists('get_newsletter_posts')) {
                 $block_data['html'] = isset($block['html']) ? wp_kses_post($block['html']) : '';
             } elseif ($block['type'] === 'wysiwyg') {
                 $block_data['wysiwyg'] = isset($block['wysiwyg']) ? wp_kses_post($block['wysiwyg']) : '';
+            } elseif ($block['type'] === 'pdf_link') {
+                $block_data['html'] = isset($block['html']) ? wp_kses_post($block['html']) : '';
             }
 
             $newsletter_data[] = $block_data;
@@ -85,7 +87,7 @@ if (!function_exists('newsletter_generate_preview_content')) {
         }
 
         foreach ($newsletter_posts as $block_data) {
-            $newsletter_html .= '<div class="newsletter-block">';
+            $newsletter_html .= '<div class="newsletter-block" style="margin-bottom: 20px;">';
 
             if ($block_data['show_title'] && (!empty($block_data['block_title']) || !empty($block_data['title']))) {
                 $title = !empty($block_data['block_title']) ? $block_data['block_title'] : $block_data['title'];
@@ -146,6 +148,9 @@ if (!function_exists('newsletter_generate_preview_content')) {
                 $newsletter_html .= wp_kses_post(wp_unslash($block_data['html']));
             } elseif ($block_data['type'] === 'wysiwyg' && isset($block_data['wysiwyg'])) {
                 $newsletter_html .= wp_kses_post(wp_unslash($block_data['wysiwyg']));
+            } elseif ($block_data['type'] === 'pdf_link' && isset($block_data['html'])) {
+                // For PDF Link blocks, we treat them like HTML blocks
+                $newsletter_html .= wp_kses_post(wp_unslash($block_data['html']));
             }
 
             $newsletter_html .= '</div>';

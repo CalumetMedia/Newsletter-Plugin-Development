@@ -149,6 +149,25 @@ function get_newsletter_blocks_by_slug($slug) {
                 $block['html'] = '';
                 error_log("Empty HTML content in block");
             }
+        } elseif ($block['type'] === 'pdf_link') {
+            error_log("Processing PDF Link block");
+            // Get template content if template_id is set
+            if (isset($block['template_id'])) {
+                $available_templates = get_option('newsletter_templates', []);
+                $template_id = $block['template_id'];
+                
+                if (isset($available_templates[$template_id])) {
+                    // Store the template content as if it was HTML content
+                    $block['html'] = wp_kses_post(wp_unslash($available_templates[$template_id]['html']));
+                    error_log("Loaded template content for PDF Link block");
+                } else {
+                    error_log("Template not found for PDF Link block: $template_id");
+                    $block['html'] = ''; // Empty if template not found
+                }
+            } else {
+                error_log("No template_id set for PDF Link block");
+                $block['html'] = '';
+            }
         }
         
         // Ensure all blocks have common fields

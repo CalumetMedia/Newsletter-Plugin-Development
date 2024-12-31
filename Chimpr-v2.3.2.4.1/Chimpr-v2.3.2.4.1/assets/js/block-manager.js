@@ -189,12 +189,62 @@
         
         // Enable/disable fields based on block type
         var isContentType = blockType === 'content';
-        block.find('.category-select select, .template-select select, .date-range-row select, .story-count-row select, .manual-override-toggle')
-            .prop('disabled', !isContentType);
+        var isPdfLinkType = blockType === 'pdf_link';
         
-        // Set opacity for visual feedback
-        block.find('.category-select, .template-select, .date-range-row, .story-count-row')
-            .css('opacity', isContentType ? '1' : '0.7');
+        if (isPdfLinkType) {
+            console.log('=== Switching to PDF Link type ===');
+            
+            // Debug current state
+            var $storyCount = block.find('.story-count-row select, .block-story-count');
+            console.log('Story count before type change:', {
+                element: $storyCount[0],
+                disabled: $storyCount.prop('disabled'),
+                opacity: $storyCount.css('opacity'),
+                value: $storyCount.val()
+            });
+        }
+        
+        // Disable all fields by default
+        block.find('.category-select select, .date-range-row select, .story-count-row select, .manual-override-toggle, .block-story-count')
+            .each(function() {
+                if (isPdfLinkType) {
+                    console.log('Disabling on type change:', this.name || this.className);
+                }
+                $(this).prop('disabled', true);
+            })
+            .closest('div')
+            .css('opacity', '0.7');
+        
+        // Also set opacity on select elements themselves for PDF Link
+        if (isPdfLinkType) {
+            block.find('.category-select select, .date-range-row select, .story-count-row select, .block-story-count')
+                .each(function() {
+                    $(this).css('opacity', '0.7');
+                    console.log('Set opacity on type change:', this.name || this.className);
+                });
+                
+            // Debug state after changes
+            console.log('Story count after type change:', {
+                element: $storyCount[0],
+                disabled: $storyCount.prop('disabled'),
+                opacity: $storyCount.css('opacity'),
+                value: $storyCount.val()
+            });
+        }
+        
+        // Enable template for both content and pdf_link types
+        block.find('.template-select select')
+            .prop('disabled', !(isContentType || isPdfLinkType))
+            .closest('div')
+            .css('opacity', (isContentType || isPdfLinkType) ? '1' : '0.7');
+        
+        // For content type, enable all fields
+        if (isContentType) {
+            block.find('.category-select select, .date-range-row select, .story-count-row select, .manual-override-toggle')
+                .prop('disabled', false)
+                .closest('div')
+                .css('opacity', '1');
+        }
         
         if (blockType === 'content') {
             block.find('.content-block').show();
@@ -262,22 +312,75 @@
     // Initialize a single block with all necessary handlers and setup
     window.initializeBlock = function(block) {
         try {
-            console.log('Initializing block:', block.data('index'));
+            var blockIndex = block.data('index');
+            console.log('=== Initializing block:', blockIndex, '===');
             
-            // Initialize sortable functionality
+            // Get block type first
+            var blockType = block.find('.block-type').val();
+            console.log('Block type:', blockType);
+            
+            // Handle initial state for PDF Link type before any other initialization
+            if (blockType === 'pdf_link') {
+                console.log('PDF Link block detected - Setting initial state');
+                
+                // Debug current state
+                var $storyCount = block.find('.story-count-row select, .block-story-count');
+                console.log('Story count before:', {
+                    element: $storyCount[0],
+                    disabled: $storyCount.prop('disabled'),
+                    opacity: $storyCount.css('opacity'),
+                    value: $storyCount.val()
+                });
+                
+                // First disable all fields and set opacity
+                block.find('.category-select select, .date-range-row select, .story-count-row select, .manual-override-toggle, .block-story-count')
+                    .each(function() {
+                        $(this).prop('disabled', true);
+                        console.log('Disabled element:', this.name || this.className);
+                    });
+                
+                // Set opacity on both the elements and their containers
+                block.find('.category-select, .date-range-row, .story-count-row')
+                    .css('opacity', '0.7');
+                block.find('.category-select select, .date-range-row select, .story-count-row select, .block-story-count')
+                    .css('opacity', '0.7');
+                
+                // Debug state after changes
+                console.log('Story count after:', {
+                    element: $storyCount[0],
+                    disabled: $storyCount.prop('disabled'),
+                    opacity: $storyCount.css('opacity'),
+                    value: $storyCount.val()
+                });
+                
+                // Enable template only
+                block.find('.template-select select')
+                    .prop('disabled', false)
+                    .css('opacity', '1');
+                block.find('.template-select')
+                    .css('opacity', '1');
+                
+                console.log('PDF Link block initialization complete');
+                
+                // Skip other initializations for PDF Link type
+                setupBlockEventHandlers(block);
+                return;
+            }
+            
+            // Rest of the initialization code for other block types
+            // Initialize sortable functionality for non-PDF blocks
             initializeSortable(block);
             
             // Set initial state of story count dropdown based on manual override
             var isManual = block.find('input[name*="[manual_override]"]').prop('checked');
             var $storyCount = block.find('.block-story-count');
             
-            // Ensure story count is properly initialized
+            // Ensure story count is properly initialized for other types
             console.log('Initializing story count - Manual override:', isManual);
             $storyCount.prop('disabled', isManual);
             $storyCount.css('opacity', isManual ? '0.7' : '1');
             
             // Initial block type setup
-            var blockType = block.find('.block-type').val();
             handleBlockTypeChange(block, blockType);
 
             // Set up all event handlers for this block
@@ -436,6 +539,26 @@
 
     // Event handlers for blocks
     function setupBlockEventHandlers(block) {
+        // Check if this is a PDF Link block first
+        var blockType = block.find('.block-type').val();
+        if (blockType === 'pdf_link') {
+            console.log('Setting up PDF Link block handlers');
+            // Ensure fields stay disabled
+            block.find('.category-select select, .date-range-row select, .story-count-row select, .manual-override-toggle, .block-story-count')
+                .prop('disabled', true)
+                .css('opacity', '0.7');
+            
+            block.find('.category-select, .date-range-row, .story-count-row')
+                .css('opacity', '0.7');
+            
+            // Keep template enabled
+            block.find('.template-select select')
+                .prop('disabled', false)
+                .css('opacity', '1');
+            block.find('.template-select')
+                .css('opacity', '1');
+        }
+
         // Title change handler
         block.find('.block-title-input').off('change keyup paste input').on('change keyup paste input', function() {
             if (isUpdateInProgress()) return;
@@ -724,6 +847,7 @@
                                 <option value="content">Content</option>
                                 <option value="html">HTML</option>
                                 <option value="wysiwyg">WYSIWYG Editor</option>
+                                <option value="pdf_link">PDF Link</option>
                             </select>
                         </div>
 
@@ -763,12 +887,21 @@
                         </select>
                     </div>
 
-                    <div class="story-count-row" style="margin-bottom: 10px;">
-                        <label>Number of Stories:</label>
-                        <select name="blocks[${blockIndex}][story_count]" class="block-story-count" style="width: 200px; height: 36px; line-height: 1.4; padding: 0 6px;">
-                            <option value="disable" selected>All</option>
-                            ${Array.from({length: 10}, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}
-                        </select>
+                    <div class="story-count-row" style="display: flex; gap: 15px; margin-bottom: 10px;">
+                        <div>
+                            <label>Number of Stories:</label>
+                            <select name="blocks[${blockIndex}][story_count]" class="block-story-count" style="width: 200px; height: 36px; line-height: 1.4; padding: 0 6px;">
+                                <option value="disable" selected>All</option>
+                                ${Array.from({length: 10}, (_, i) => `<option value="${i + 1}">${i + 1}</option>`).join('')}
+                            </select>
+                        </div>
+
+                        <div style="display: flex; align-items: flex-end; padding-bottom: 8px;">
+                            <label>
+                                <input type="checkbox" name="blocks[${blockIndex}][manual_override]" class="manual-override-toggle" value="1">
+                                Manual Override Stories
+                            </label>
+                        </div>
                     </div>
 
                     <div class="content-block">
@@ -794,6 +927,27 @@
 
         $('#blocks-container').append(blockHtml);
         var newBlock = $('#blocks-container .block-item').last();
+        
+        // Set initial state for fields based on block type
+        var initialBlockType = newBlock.find('.block-type').val();
+        if (initialBlockType === 'pdf_link') {
+            // First disable all fields and set opacity
+            newBlock.find('.category-select select, .date-range-row select, .story-count-row select, .manual-override-toggle, .block-story-count')
+                .prop('disabled', true);
+            
+            // Set opacity on both the elements and their containers
+            newBlock.find('.category-select, .date-range-row, .story-count-row')
+                .css('opacity', '0.7');
+            newBlock.find('.category-select select, .date-range-row select, .story-count-row select, .block-story-count')
+                .css('opacity', '0.7');
+            
+            // Enable template only
+            newBlock.find('.template-select select')
+                .prop('disabled', false)
+                .css('opacity', '1');
+            newBlock.find('.template-select')
+                .css('opacity', '1');
+        }
         
         initializeBlock(newBlock);
 
@@ -834,13 +988,48 @@
             return;
         }
         
-        // Initialize each block
+        // First pass: handle PDF Link blocks
+        blocks.each(function() {
+            var block = $(this);
+            var blockType = block.find('.block-type').val();
+            
+            if (blockType === 'pdf_link') {
+                console.log('Found PDF Link block, initializing...');
+                // Disable all fields except template
+                block.find('.category-select select, .date-range-row select, .story-count-row select, .manual-override-toggle, .block-story-count')
+                    .prop('disabled', true)
+                    .css('opacity', '0.7');
+                
+                block.find('.category-select, .date-range-row, .story-count-row')
+                    .css('opacity', '0.7');
+                
+                // Enable only template
+                block.find('.template-select select')
+                    .prop('disabled', false)
+                    .css('opacity', '1');
+                block.find('.template-select')
+                    .css('opacity', '1');
+                
+                loadedBlocks++;
+                window.newsletterState.blocksLoaded = loadedBlocks;
+            }
+        });
+        
+        // Second pass: initialize remaining blocks
         blocks.each(function(index) {
             var block = $(this);
+            var blockType = block.find('.block-type').val();
+            
+            // Skip if already handled as PDF Link
+            if (blockType === 'pdf_link') {
+                return;
+            }
+            
             // Set the block index explicitly
             block.attr('data-block-index', index);
             setupBlockEventHandlers(block);
             
+            // Rest of the existing initialization code
             // Get initial values - check both class and name attribute for category
             var categorySelect = block.find('.block-category');
             var categoryId = categorySelect.val();

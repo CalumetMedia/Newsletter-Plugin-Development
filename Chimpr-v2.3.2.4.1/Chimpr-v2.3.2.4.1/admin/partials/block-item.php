@@ -62,6 +62,7 @@ if (!isset($block_templates['default'])) {
                     <option value="content" <?php selected($block['type'], 'content'); ?>><?php esc_html_e('Content', 'newsletter'); ?></option>
                     <option value="html" <?php selected($block['type'], 'html'); ?>><?php esc_html_e('HTML', 'newsletter'); ?></option>
                     <option value="wysiwyg" <?php selected($block['type'], 'wysiwyg'); ?>><?php esc_html_e('WYSIWYG Editor', 'newsletter'); ?></option>
+                    <option value="pdf_link" <?php selected($block['type'], 'pdf_link'); ?>><?php esc_html_e('PDF Link', 'newsletter'); ?></option>
                 </select>
             </div>
 
@@ -70,7 +71,7 @@ if (!isset($block_templates['default'])) {
                 <select name="blocks[<?php echo esc_attr($index); ?>][category]" 
                         class="block-category" 
                         style="width: 100%; height: 36px; line-height: 1.4; padding: 0 6px;"
-                        <?php echo ($block['type'] === 'html' || $block['type'] === 'wysiwyg') ? 'disabled' : ''; ?>>
+                        <?php echo ($block['type'] === 'html' || $block['type'] === 'wysiwyg' || $block['type'] === 'pdf_link') ? 'disabled' : ''; ?>>
                     <option value=""><?php esc_html_e('-- Select Category --', 'newsletter'); ?></option>
                     <?php
                     if (!empty($all_categories)) {
@@ -106,7 +107,7 @@ if (!isset($block_templates['default'])) {
                 <select name="blocks[<?php echo esc_attr($index); ?>][date_range]" 
                         class="block-date-range" 
                         style="width: 200px; height: 36px; line-height: 1.4; padding: 0 6px;"
-                        <?php echo ($block['type'] === 'html' || $block['type'] === 'wysiwyg') ? 'disabled' : ''; ?>>
+                        <?php echo ($block['type'] === 'html' || $block['type'] === 'wysiwyg' || $block['type'] === 'pdf_link') ? 'disabled' : ''; ?>>
                     <option value="1" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 1); ?>><?php esc_html_e('Previous 1 Day', 'newsletter'); ?></option>
                     <option value="2" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 2); ?>><?php esc_html_e('Previous 2 Days', 'newsletter'); ?></option>
                     <option value="3" <?php selected(isset($block['date_range']) ? $block['date_range'] : 7, 3); ?>><?php esc_html_e('Previous 3 Days', 'newsletter'); ?></option>
@@ -127,7 +128,7 @@ if (!isset($block_templates['default'])) {
                         class="block-story-count" 
                         style="width: 200px; height: 36px; line-height: 1.4; padding: 0 6px;"
                         data-block-index="<?php echo esc_attr($index); ?>"
-                        <?php echo ($block['type'] === 'html' || $block['type'] === 'wysiwyg') ? 'disabled' : ''; ?>>
+                        <?php echo ($block['type'] === 'html' || $block['type'] === 'wysiwyg' || $block['type'] === 'pdf_link') ? 'disabled' : ''; ?>>
                     <option value="disable" <?php selected($current_story_count, 'disable'); ?>><?php esc_html_e('All', 'newsletter'); ?></option>
                     <?php for ($i = 1; $i <= 10; $i++) : ?>
                         <option value="<?php echo $i; ?>" <?php selected($current_story_count, $i); ?>><?php echo $i; ?></option>
@@ -142,7 +143,7 @@ if (!isset($block_templates['default'])) {
                            class="manual-override-toggle" 
                            value="1" 
                            <?php checked(isset($block['manual_override']) && $block['manual_override']); ?>
-                           <?php echo ($block['type'] === 'html' || $block['type'] === 'wysiwyg') ? 'disabled' : ''; ?>>
+                           <?php echo ($block['type'] === 'html' || $block['type'] === 'wysiwyg' || $block['type'] === 'pdf_link') ? 'disabled' : ''; ?>>
                     <?php esc_html_e('Manual Override Stories', 'newsletter'); ?>
                 </label>
             </div>

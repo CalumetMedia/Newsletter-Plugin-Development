@@ -180,31 +180,70 @@
                 var editorId = $(this).attr('id');
                 if (typeof wp !== 'undefined' && wp.editor && editorId) {
                     try {
-                        // Remove any existing editor first
-                        wp.editor.remove(editorId);
+                        // Store content before removing editor
+                        var currentContent = '';
+                        if (tinymce.get(editorId)) {
+                            currentContent = tinymce.get(editorId).getContent();
+                            wp.editor.remove(editorId);
+                        } else {
+                            currentContent = $(this).val();
+                        }
                         
-                        // Initialize the editor
-                        wp.editor.initialize(editorId, {
-                            tinymce: {
-                                wpautop: true,
-                                plugins: 'paste,lists,link,textcolor,wordpress,wplink,hr,charmap,wptextpattern',
-                                toolbar1: 'formatselect,bold,italic,bullist,numlist,link,unlink,forecolor,hr',
-                                setup: function(editor) {
-                                    editor.on('change keyup paste input', function() {
-                                        console.log('WYSIWYG editor content changed');
-                                        if (isUpdateInProgress()) return;
+                        // Initialize the editor with a promise to ensure proper setup
+                        new Promise((resolve) => {
+                            wp.editor.initialize(editorId, {
+                                tinymce: {
+                                    wpautop: true,
+                                    plugins: 'paste,lists,link,textcolor,wordpress,wplink,hr,charmap,wptextpattern',
+                                    toolbar1: 'formatselect,bold,italic,bullist,numlist,link,unlink,forecolor,hr',
+                                    setup: function(editor) {
+                                        editor.on('init', function() {
+                                            // Store initial content for comparison
+                                            editor.initialContent = currentContent;
+                                            
+                                            if (currentContent) {
+                                                if (currentContent.indexOf('<p>') === -1) {
+                                                    currentContent = switchEditors.wpautop(currentContent);
+                                                }
+                                                editor.setContent(currentContent);
+                                                editor.save();
+                                            }
+                                            resolve(editor);
+                                        });
                                         
-                                        editor.save();
-                                        setUpdateInProgress(true);
-                                        setTimeout(() => {
-                                            updatePreview('wysiwyg_content_change');
-                                            setUpdateInProgress(false);
-                                        }, 250);
-                                    });
-                                }
-                            },
-                            quicktags: true,
-                            mediaButtons: true
+                                        editor.on('change keyup paste input', function() {
+                                            if (isUpdateInProgress()) return;
+                                            
+                                            clearTimeout(editor.blockChangeTimer);
+                                            editor.blockChangeTimer = setTimeout(() => {
+                                                editor.save();
+                                                var content = editor.getContent();
+                                                
+                                                // Only trigger update if content has actually changed
+                                                if (content !== editor.initialContent) {
+                                                    editor.initialContent = content;
+                                                    setUpdateInProgress(true);
+                                                    updatePreview('wysiwyg_content_change');
+                                                    setUpdateInProgress(false);
+                                                }
+                                            }, 250);
+                                        });
+
+                                        // Handle editor cleanup
+                                        editor.on('remove', function() {
+                                            editor.save();
+                                        });
+                                    }
+                                },
+                                quicktags: true,
+                                mediaButtons: true
+                            });
+                        }).then(editor => {
+                            // Ensure content is saved to textarea after initialization
+                            editor.save();
+                            $(editor.getElement()).trigger('change');
+                        }).catch(error => {
+                            console.error('Error initializing editor:', error);
                         });
                     } catch (editorError) {
                         console.error('Error initializing editor:', editorError);
@@ -272,12 +311,12 @@
             var $checkbox = $post.find('input[type="checkbox"][name*="[checked]"]');
             var $orderInput = $post.find('.post-order');
             
-            // Only store data for checked posts
+            // Only store checked posts
             if ($checkbox.prop('checked')) {
                 console.log('Post ' + postId + ' is checked, storing data');
                 posts[postId] = {
                     checked: '1',
-                    order: $orderInput.val() || '9223372036854775807'
+                    order: $orderInput.val() || '0'
                 };
             }
         });
@@ -287,7 +326,17 @@
     function saveBlockState($block, isManual, callback) {
         var blockIndex = $block.data('index');
         var blocks = [];
-        blocks[blockIndex] = collectBlockData($block, isManual);
+        blocks[blockIndex] = {
+            type: $block.find('.block-type').val(),
+            title: $block.find('.block-title-input').val(),
+            show_title: $block.find('.show-title-toggle').prop('checked') ? 1 : 0,
+            template_id: $block.find('.block-template').val(),
+            category: $block.find('.block-category').val(),
+            date_range: $block.find('.block-date-range').val(),
+            story_count: $block.find('.block-story-count').val(),
+            manual_override: isManual ? 1 : 0,
+            posts: collectPostData($block)
+        };
 
         return $.ajax({
             url: newsletterData.ajaxUrl,
@@ -502,10 +551,18 @@
                     console.log('WYSIWYG textarea content changed');
                     if (isUpdateInProgress()) return;
                     
-                    setUpdateInProgress(true);
-                    setTimeout(() => {
-                        updatePreview('wysiwyg_content_change');
-                        setUpdateInProgress(false);
+                    clearTimeout(this.textareaTimer);
+                    this.textareaTimer = setTimeout(() => {
+                        var content = $(this).val();
+                        var previousContent = $(this).data('previous-content');
+                        
+                        // Only trigger update if content has actually changed
+                        if (content !== previousContent) {
+                            $(this).data('previous-content', content);
+                            setUpdateInProgress(true);
+                            updatePreview('wysiwyg_content_change');
+                            setUpdateInProgress(false);
+                        }
                     }, 250);
                 });
             }

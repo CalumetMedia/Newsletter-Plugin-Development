@@ -9,6 +9,9 @@
                     tinymce.execCommand('mceRemoveEditor', true, editorId);
                 }
                 
+                // Store current content before initialization
+                var currentContent = $(this).val();
+                
                 wp.editor.initialize(editorId, {
                     tinymce: {
                         wpautop: true,
@@ -19,29 +22,45 @@
                         verify_html: false,
                         entities: '160,nbsp',
                         fix_list_elements: true,
+                        // Force paragraph formatting
+                        forced_root_block: 'p',
+                        remove_linebreaks: false,
+                        convert_newlines_to_brs: false,
+                        remove_redundant_brs: false,
                         setup: function(editor) {
                             // Initialize editor content
                             editor.on('init', function() {
                                 console.log('Editor initialized:', editorId);
-                                var content = editor.getContent();
-                                content = content.replace(/\\'/g, "'").replace(/\\"/g, '"');
-                                if (content && content.indexOf('<p>') === -1) {
-                                    content = switchEditors.wpautop(content);
+                                // Restore content after initialization
+                                if (currentContent) {
+                                    if (currentContent.indexOf('<p>') === -1) {
+                                        currentContent = switchEditors.wpautop(currentContent);
+                                    }
+                                    editor.setContent(currentContent);
+                                    editor.save();
                                 }
-                                editor.setContent(content);
-                                console.log('Initial content set:', content);
+                                console.log('Initial content set:', currentContent);
                                 updatePreview('editor_init');
                             });
 
                             // Handle content changes
                             editor.on('change keyup NodeChange SetContent', function() {
                                 console.log('Editor content changed:', editorId);
-                                editor.save(); // Save content to textarea
-                                var content = editor.getContent();
-                                console.log('New content:', content);
-                                // Update the textarea
-                                $('#' + editorId).val(content).trigger('change');
-                                updatePreview('editor_content_change');
+                                clearTimeout(editor.contentChangeTimer);
+                                editor.contentChangeTimer = setTimeout(function() {
+                                    editor.save(); // Save content to textarea
+                                    var content = editor.getContent();
+                                    console.log('New content:', content);
+                                    
+                                    // Only trigger auto-save if content has actually changed
+                                    var previousContent = $('#' + editorId).val();
+                                    if (content !== previousContent) {
+                                        $('#' + editorId).val(content).trigger('change');
+                                        if (typeof debouncedAutoSave === 'function') {
+                                            debouncedAutoSave('editor_content_change');
+                                        }
+                                    }
+                                }, 250); // Restore original timing
                             });
 
                             // Additional keyup handler for immediate feedback
@@ -52,28 +71,45 @@
                                     editor.save();
                                     var content = editor.getContent();
                                     console.log('Keyup content:', content);
-                                    $('#' + editorId).val(content).trigger('change');
-                                    updatePreview('editor_keyup');
-                                }, 300);
+                                    
+                                    // Only trigger change if content has actually changed
+                                    var previousContent = $('#' + editorId).val();
+                                    if (content !== previousContent) {
+                                        $('#' + editorId).val(content).trigger('change');
+                                    }
+                                }, 250); // Restore original timing
                             });
 
-                            // Handle paste events
+                            // Handle paste events with proper debouncing
                             editor.on('paste', function(e) {
-                                setTimeout(function() {
+                                clearTimeout(editor.pasteTimer);
+                                editor.pasteTimer = setTimeout(function() {
                                     console.log('Editor paste:', editorId);
                                     editor.save();
                                     var content = editor.getContent();
                                     console.log('Paste content:', content);
-                                    $('#' + editorId).val(content).trigger('change');
-                                    updatePreview('editor_paste');
-                                }, 100);
+                                    
+                                    // Only trigger change if content has actually changed
+                                    var previousContent = $('#' + editorId).val();
+                                    if (content !== previousContent) {
+                                        $('#' + editorId).val(content).trigger('change');
+                                        if (typeof debouncedAutoSave === 'function') {
+                                            debouncedAutoSave('editor_paste');
+                                        }
+                                    }
+                                }, 250); // Restore original timing
+                            });
+
+                            // Handle form submission
+                            editor.on('submit', function() {
+                                editor.save();
+                            });
+
+                            // Handle editor removal
+                            editor.on('remove', function() {
+                                editor.save();
                             });
                         },
-                        // Force paragraph formatting
-                        forced_root_block: 'p',
-                        remove_linebreaks: false,
-                        convert_newlines_to_brs: false,
-                        remove_redundant_brs: false,
                         // Formatting styles
                         content_style: `
                             body { 

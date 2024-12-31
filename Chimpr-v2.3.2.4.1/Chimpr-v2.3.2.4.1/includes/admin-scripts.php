@@ -37,7 +37,8 @@ function newsletter_admin_enqueue_scripts($hook) {
         'block-manager' => ['editor'],
         'ajax-operations' => ['block-manager'],
         'preview' => ['ajax-operations'],
-        'dates' => ['preview'],
+        'auto-save' => ['preview'],
+        'dates' => ['auto-save'],
         'schedule' => ['dates'],
         'events' => ['schedule'],
         'main' => ['events']

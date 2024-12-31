@@ -1,155 +1,53 @@
 (function($) {
 
     // Save Blocks
-    window.saveBlocks = function() {
-        console.log('saveBlocks called');
-        
-        // Create blocks array
-        var blocks = [];
-        
-        // Get all blocks
-        $('#blocks-container .block-item').each(function(index) {
-            var $block = $(this);
-            var blockData = {
-                type: $block.find('.block-type').val(),
-                title: $block.find('.block-title-input').val(),
-                show_title: $block.find('.show-title-toggle').prop('checked') ? 1 : 0,
-                template_id: $block.find('.block-template').val(),
-                category: $block.find('.block-category').val(),
-                date_range: $block.find('.block-date-range').val(),
-                story_count: $block.find('.block-story-count').val(),
-                manual_override: $block.find('input[name*="[manual_override]"]').prop('checked') ? 1 : 0,
-                posts: {}
-            };
+    function saveBlocks(newsletterSlug, blocks, subjectLine, customHeader, customFooter, isAutoSave = false) {
+        return new Promise((resolve, reject) => {
+            const formData = new FormData();
+            formData.append('action', 'newsletter_handle_blocks_form_submission');
+            formData.append('security', window.saveBlocksNonce);
+            formData.append('newsletter_slug', newsletterSlug);
+            formData.append('blocks', JSON.stringify(blocks));
+            formData.append('is_auto_save', isAutoSave ? '1' : '0');
 
-            // Log block data being collected
-            console.log('Block ' + index + ' data:', {
-                type: blockData.type,
-                title: blockData.title,
-                show_title: blockData.show_title,
-                template_id: blockData.template_id,
-                category: blockData.category,
-                date_range: blockData.date_range,
-                story_count: blockData.story_count,
-                manual_override: blockData.manual_override
+            if (subjectLine) {
+                formData.append('subject_line', subjectLine);
+            }
+            if (customHeader) {
+                formData.append('custom_header', customHeader);
+            }
+            if (customFooter) {
+                formData.append('custom_footer', customFooter);
+            }
+
+            // Log the data being sent
+            console.log('Saving blocks with data:', {
+                newsletterSlug,
+                blocks,
+                isAutoSave
             });
 
-            // Collect post data
-            $block.find('.block-posts li').each(function() {
-                var $post = $(this);
-                var postId = $post.data('post-id');
-                var $checkbox = $post.find('input[type="checkbox"][name*="[checked]"]');
-                var $orderInput = $post.find('.post-order');
-                var isChecked = $checkbox.prop('checked');
-                
-                // Log post data being collected
-                console.log('Post ' + postId + ' data:', {
-                    checked: isChecked,
-                    order: $orderInput.val()
-                });
-                
-                // Only store checked posts
-                if (isChecked) {
-                    blockData.posts[postId] = {
-                        checked: '1',
-                        order: $orderInput.val() || '0'
-                    };
+            jQuery.ajax({
+                url: window.ajaxurl,
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    if (response.success) {
+                        resolve(response);
+                    } else {
+                        console.error('Save failed:', response);
+                        reject(new Error(response.data || 'Save failed'));
+                    }
+                },
+                error: function(jqXHR, textStatus, errorThrown) {
+                    console.error('Save error:', textStatus, errorThrown);
+                    reject(new Error(errorThrown || textStatus));
                 }
             });
-
-            // Add HTML content if it's an HTML block
-            if (blockData.type === 'html') {
-                blockData.html = $block.find('.html-block textarea').val();
-                console.log('HTML content:', blockData.html);
-            }
-            
-            // Add WYSIWYG content if it's a WYSIWYG block
-            if (blockData.type === 'wysiwyg') {
-                blockData.wysiwyg = $block.find('.wysiwyg-editor-content').val();
-                console.log('WYSIWYG content:', blockData.wysiwyg);
-            }
-
-            blocks[index] = blockData;
         });
-
-        console.log('Final blocks data:', blocks);
-
-        var ajaxData = {
-            action: 'save_newsletter_blocks',
-            security: newsletterData.nonceSaveBlocks,
-            newsletter_slug: newsletterData.newsletterSlug,
-            blocks: blocks
-        };
-
-        console.log('AJAX request data:', ajaxData);
-
-        $.ajax({
-            url: newsletterData.ajaxUrl,
-            method: 'POST',
-            dataType: 'json',
-            data: ajaxData,
-            success: function(response) {
-                console.log('Save response:', response);
-                if (response.success) {
-                    updatePreview();
-                    alert(newsletterData.blocksSavedMessage || 'Blocks have been saved successfully.');
-                } else {
-                    console.error('Save failed. Response:', response);
-                    var errorMessage = 'An error occurred while saving blocks.';
-                    if (response.data) {
-                        console.error('Error data:', response.data);
-                        if (typeof response.data === 'string') {
-                            errorMessage = response.data;
-                        } else if (response.data.message) {
-                            errorMessage = response.data.message;
-                            if (response.data.debug_info) {
-                                console.error('Debug info:', response.data.debug_info);
-                                errorMessage += '\n\nDebug info:\n' + JSON.stringify(response.data.debug_info, null, 2);
-                            }
-                        } else if (response.data.error) {
-                            errorMessage = response.data.error;
-                        }
-                    }
-                    alert(errorMessage);
-                }
-            },
-            error: function(xhr, status, error) {
-                console.error('AJAX Error:', {
-                    status: status,
-                    error: error,
-                    responseText: xhr.responseText,
-                    statusCode: xhr.status
-                });
-                
-                var errorMessage = 'Error saving blocks';
-                try {
-                    var responseData = JSON.parse(xhr.responseText);
-                    if (responseData.data) {
-                        if (typeof responseData.data === 'string') {
-                            errorMessage += ': ' + responseData.data;
-                        } else if (responseData.data.message) {
-                            errorMessage += ': ' + responseData.data.message;
-                            if (responseData.data.debug_info) {
-                                console.error('Debug info:', responseData.data.debug_info);
-                                errorMessage += '\n\nDebug info:\n' + JSON.stringify(responseData.data.debug_info, null, 2);
-                            }
-                        } else {
-                            errorMessage += ': ' + JSON.stringify(responseData.data);
-                        }
-                    } else if (typeof error === 'string') {
-                        errorMessage += ': ' + error;
-                    }
-                } catch (e) {
-                    if (xhr.responseText) {
-                        errorMessage += ': ' + xhr.responseText;
-                    } else if (typeof error === 'string') {
-                        errorMessage += ': ' + error;
-                    }
-                }
-                alert(errorMessage);
-            }
-        });
-    };
+    }
 
     window.sendTestEmail = function(testEmail) {
         $.ajax({

@@ -154,6 +154,9 @@ if (!isset($block_templates['default'])) {
     // Add error logging
     error_log("Initializing WYSIWYG editor $editor_id with content: " . $wysiwyg_content);
     
+    // Store the original content in a hidden field for comparison
+    echo '<input type="hidden" id="' . esc_attr($editor_id) . '-original" value="' . esc_attr($wysiwyg_content) . '">';
+    
     wp_editor(
         $wysiwyg_content,
         $editor_id,
@@ -163,15 +166,39 @@ if (!isset($block_templates['default'])) {
             'textarea_rows' => 15,
             'editor_class' => 'wysiwyg-editor-content',
             'tinymce' => array(
+                'wpautop' => true,
+                'plugins' => 'paste,lists,link,textcolor,wordpress,wplink,hr,charmap,wptextpattern',
+                'toolbar1' => 'formatselect,bold,italic,bullist,numlist,link,unlink,forecolor,hr',
                 'init_instance_callback' => "function(editor) {
-                    editor.on('change', function(e) {
+                    editor.on('change keyup NodeChange SetContent', function() {
                         editor.save();
-                        jQuery(editor.getElement()).trigger('change');
+                        var content = editor.getContent();
+                        var originalContent = jQuery('#' + editor.id + '-original').val();
+                        
+                        // Only trigger change if content has actually changed
+                        if (content !== originalContent) {
+                            jQuery('#' + editor.id + '-original').val(content);
+                            jQuery(editor.getElement()).trigger('change');
+                        }
+                    });
+                    
+                    editor.on('blur', function() {
+                        editor.save();
                     });
                 }",
                 'setup' => "function(editor) {
-                    editor.on('change', function() {
-                        editor.save();
+                    editor.on('init', function() {
+                        var content = editor.getContent();
+                        jQuery('#' + editor.id + '-original').val(content);
+                    });
+                    
+                    editor.on('BeforeSetContent', function(e) {
+                        if (e.content === '' || e.content === '<p></p>') {
+                            var originalContent = jQuery('#' + editor.id + '-original').val();
+                            if (originalContent) {
+                                e.content = originalContent;
+                            }
+                        }
                     });
                 }"
             ),

@@ -66,7 +66,7 @@ function get_newsletter_blocks_by_slug($slug) {
 
     error_log("Retrieved blocks for slug '$slug': " . print_r($blocks, true));
 
-    // Process each content block to maintain selected posts
+    // Process each block to maintain all necessary data
     foreach ($blocks as &$block) {
         if ($block['type'] === 'content') {
             $story_count = isset($block['story_count']) ? $block['story_count'] : 'disable';
@@ -79,9 +79,9 @@ function get_newsletter_blocks_by_slug($slug) {
                 // Get all available posts for the block's category and date range
                 $args = array(
                     'posts_per_page' => -1,
-                    'category' => $block['category'],
+                    'category' => isset($block['category']) ? $block['category'] : '',
                     'date_query' => array(
-                        'after' => date('Y-m-d', strtotime("-{$block['date_range']} days"))
+                        'after' => isset($block['date_range']) ? date('Y-m-d', strtotime("-{$block['date_range']} days")) : date('Y-m-d', strtotime('-7 days'))
                     ),
                     'orderby' => 'date',
                     'order' => 'DESC'
@@ -95,33 +95,58 @@ function get_newsletter_blocks_by_slug($slug) {
                     // Only include posts that are explicitly checked in manual mode
                     if (isset($selected_posts[$post_id]) && isset($selected_posts[$post_id]['checked']) && $selected_posts[$post_id]['checked'] === '1') {
                         $block['posts'][$post_id] = [
-                            'selected' => true,
+                            'checked' => '1',
                             'order' => isset($selected_posts[$post_id]['order']) 
                                 ? $selected_posts[$post_id]['order'] 
                                 : $current_count
                         ];
                         $current_count++;
-                    } elseif (!$block['manual_override'] && $count > 0 && $current_count < $count) {
+                    } elseif (!isset($block['manual_override']) || !$block['manual_override']) {
                         // In automatic mode, include posts based on story count
-                        $block['posts'][$post_id] = [
-                            'selected' => true,
-                            'order' => $current_count
-                        ];
-                        $current_count++;
+                        if ($count <= 0 || $current_count < $count) {
+                            $block['posts'][$post_id] = [
+                                'checked' => '1',
+                                'order' => $current_count
+                            ];
+                            $current_count++;
+                        }
                     }
                 }
             }
         } elseif ($block['type'] === 'wysiwyg') {
             error_log("Processing WYSIWYG block: " . print_r($block, true));
-            // Ensure WYSIWYG content is properly sanitized but preserves HTML
+            // Always preserve WYSIWYG content
             if (isset($block['wysiwyg'])) {
-                $block['wysiwyg'] = wp_kses_post(wp_unslash($block['wysiwyg']));
-                error_log("Sanitized WYSIWYG content: " . $block['wysiwyg']);
+                // Preserve HTML formatting while ensuring security
+                $content = wp_unslash($block['wysiwyg']);
+                if (!empty($content) && strpos($content, '<p>') === false) {
+                    $content = wpautop($content);
+                }
+                $block['wysiwyg'] = wp_kses_post($content);
+                error_log("Processed WYSIWYG content length: " . strlen($block['wysiwyg']));
+            } else {
+                $block['wysiwyg'] = '';
+                error_log("Empty WYSIWYG content in block");
+            }
+        } elseif ($block['type'] === 'html') {
+            // Always preserve HTML content
+            if (isset($block['html'])) {
+                $block['html'] = wp_kses_post(wp_unslash($block['html']));
+                error_log("Processed HTML block content");
+            } else {
+                $block['html'] = '';
+                error_log("Empty HTML content in block");
             }
         }
+        
+        // Ensure all blocks have common fields
+        $block['show_title'] = isset($block['show_title']) ? (bool)$block['show_title'] : true;
+        $block['template_id'] = isset($block['template_id']) ? sanitize_text_field($block['template_id']) : 'default';
+        $block['block_title'] = isset($block['title']) ? sanitize_text_field($block['title']) : '';
     }
     unset($block);
 
+    error_log("Processed blocks for preview: " . print_r($blocks, true));
     return $blocks;
 }
 

@@ -37,7 +37,7 @@ if (!isset($block_templates['default'])) {
         <input type="text" 
                name="blocks[<?php echo esc_attr($index); ?>][title]" 
                class="block-title-input" 
-               value="<?php echo esc_attr(wp_unslash($block['title'])); ?>" 
+               value="<?php echo esc_attr(stripslashes($block['title'])); ?>" 
                style="width: 100%; height: 36px;" />
     </div>
             <div style="margin-left: 15px;">

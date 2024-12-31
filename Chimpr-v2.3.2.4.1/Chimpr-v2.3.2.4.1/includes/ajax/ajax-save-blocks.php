@@ -76,9 +76,13 @@ function newsletter_handle_blocks_form_submission() {
                 continue;
             }
 
+            // First sanitize the title without stripping slashes to preserve it for comparison
+            $raw_title = isset($block['title']) ? $block['title'] : '';
+            error_log("[Block Debug] Processing title: " . $raw_title);
+            
             $sanitized_block = [
                 'type' => sanitize_text_field($block['type']),
-                'title' => isset($block['title']) ? sanitize_text_field($block['title']) : '',
+                'title' => sanitize_text_field($raw_title),
                 'show_title' => isset($block['show_title']) ? (int)$block['show_title'] : 1,
                 'template_id' => isset($block['template_id']) ? sanitize_text_field($block['template_id']) : '0',
                 'category' => isset($block['category']) ? sanitize_text_field($block['category']) : '',
@@ -87,6 +91,8 @@ function newsletter_handle_blocks_form_submission() {
                 'manual_override' => isset($block['manual_override']) ? (int)$block['manual_override'] : 0,
                 'posts' => []
             ];
+
+            error_log("[Block Debug] Sanitized title: " . $sanitized_block['title']);
 
             // Handle posts for content blocks
             if ($block['type'] === 'content' && isset($block['posts']) && is_array($block['posts'])) {
@@ -109,7 +115,7 @@ function newsletter_handle_blocks_form_submission() {
                 if ($is_auto_save && !empty($existing_blocks)) {
                     foreach ($existing_blocks as $existing_block) {
                         if ($existing_block['type'] === 'wysiwyg' && 
-                            $existing_block['title'] === $sanitized_block['title']) {
+                            stripslashes($existing_block['title']) === stripslashes($sanitized_block['title'])) {
                             $existing_content = $existing_block['wysiwyg'];
                             error_log("[WYSIWYG Debug] Found existing content for block: " . $sanitized_block['title']);
                             break;
@@ -118,8 +124,8 @@ function newsletter_handle_blocks_form_submission() {
                 }
                 
                 if (isset($block['wysiwyg'])) {
-                    // Let WordPress handle initial unslashing, apply sanitization after
-                    $content = $block['wysiwyg'];
+                    // Handle content with proper slashing
+                    $content = stripslashes($block['wysiwyg']);
                     
                     // If auto-saving and new content is empty or just a blank paragraph, preserve existing content
                     if ($is_auto_save && 
@@ -152,60 +158,113 @@ function newsletter_handle_blocks_form_submission() {
 
             // Handle HTML blocks
             if ($block['type'] === 'html' && isset($block['html'])) {
-                $sanitized_block['html'] = wp_kses_post($block['html']);
+                error_log("[Block Debug] Processing HTML block - Title: " . (isset($block['title']) ? $block['title'] : 'untitled'));
+                error_log("[Block Debug] HTML Content Length: " . strlen($block['html']));
+                $sanitized_block['html'] = wp_kses_post(stripslashes($block['html']));
+                error_log("[Block Debug] Sanitized HTML Length: " . strlen($sanitized_block['html']));
             }
 
+            // Log block before adding to sanitized blocks
+            error_log("[Block Debug] Adding block to sanitized_blocks - Type: " . $block['type']);
+            error_log("[Block Debug] Block details: " . print_r($sanitized_block, true));
             $sanitized_blocks[] = $sanitized_block;
+
+            // Log sanitized blocks array size
+            error_log("[Block Debug] Current sanitized_blocks count: " . count($sanitized_blocks));
         }
+
+        // Log final blocks array before any merging
+        error_log("[Block Debug] Final sanitized blocks before merge/save:");
+        error_log(print_r($sanitized_blocks, true));
 
         // Merge with existing blocks if auto-saving
         if ($is_auto_save && !empty($existing_blocks)) {
-            error_log("[WYSIWYG Debug] Auto-save detected, merging with existing blocks");
-            $merged_blocks = [];
+            error_log("[Block Debug] Auto-save detected");
+            error_log("[Block Debug] Existing blocks count: " . count($existing_blocks));
+            error_log("[Block Debug] New blocks count: " . count($sanitized_blocks));
             
-            // First, add all existing blocks to the merged array
-            foreach ($existing_blocks as $existing_block) {
-                $merged_blocks[] = $existing_block;
-            }
-            
-            // Then, update or add new blocks
-            foreach ($sanitized_blocks as $new_block) {
-                $block_exists = false;
-                
-                // Look for matching block in merged blocks
-                foreach ($merged_blocks as $key => $merged_block) {
-                    if ($new_block['type'] === $merged_block['type'] && 
-                        $new_block['title'] === $merged_block['title']) {
-                        
-                        // For WYSIWYG blocks, preserve content if new content is empty
-                        if ($new_block['type'] === 'wysiwyg' && 
-                            empty(trim($new_block['wysiwyg'])) && 
-                            !empty($merged_block['wysiwyg'])) {
-                            $new_block['wysiwyg'] = $merged_block['wysiwyg'];
-                            error_log("[WYSIWYG Debug] Preserved existing content for block: " . $new_block['title']);
-                        }
-                        
-                        $merged_blocks[$key] = $new_block;
-                        $block_exists = true;
-                        break;
-                    }
-                }
-                
-                // If block doesn't exist in merged blocks, add it
-                if (!$block_exists) {
-                    $merged_blocks[] = $new_block;
-                }
+            // Check if blocks are actually different
+            if (serialize($existing_blocks) !== serialize($sanitized_blocks)) {
+                error_log("[Block Debug] Blocks differ - Details:");
+                error_log("Existing: " . print_r($existing_blocks, true));
+                error_log("New: " . print_r($sanitized_blocks, true));
+                $merged_blocks = $sanitized_blocks;
+            } else {
+                error_log("[Block Debug] Blocks identical - keeping existing");
+                $merged_blocks = $existing_blocks;
             }
             
             $sanitized_blocks = array_values($merged_blocks);
-            error_log("[WYSIWYG Debug] Final merged blocks: " . print_r($sanitized_blocks, true));
+            error_log("[Block Debug] Final block count after merge: " . count($sanitized_blocks));
         }
 
         // Check if data has actually changed
         $current_blocks = get_option("newsletter_blocks_$newsletter_slug", []);
         $save_result = false;
         
-        if (serialize($current_blocks) !== serialize($sanitized_blocks)) {
+        // Compare blocks with special handling for WYSIWYG content
+        $blocks_changed = false;
+        if (count($current_blocks) !== count($sanitized_blocks)) {
+            $blocks_changed = true;
+            error_log("[Block Debug] Block count changed - Current: " . count($current_blocks) . ", New: " . count($sanitized_blocks));
+        } else {
+            foreach ($sanitized_blocks as $index => $new_block) {
+                if (!isset($current_blocks[$index])) {
+                    $blocks_changed = true;
+                    error_log("[Block Debug] New block at index $index");
+                    break;
+                }
+                
+                $current_block = $current_blocks[$index];
+                
+                // Compare titles first
+                if ($new_block['title'] !== $current_block['title']) {
+                    $blocks_changed = true;
+                    error_log("[Block Debug] Title changed at index $index - Old: " . $current_block['title'] . ", New: " . $new_block['title']);
+                    break;
+                }
+                
+                if ($new_block['type'] !== $current_block['type']) {
+                    $blocks_changed = true;
+                    error_log("[Block Debug] Block type changed at index $index");
+                    break;
+                }
+                
+                // For WYSIWYG blocks, compare normalized content
+                if ($new_block['type'] === 'wysiwyg') {
+                    $current_content = isset($current_block['wysiwyg']) ? trim(wp_kses_post($current_block['wysiwyg'])) : '';
+                    $new_content = isset($new_block['wysiwyg']) ? trim(wp_kses_post($new_block['wysiwyg'])) : '';
+                    
+                    if ($current_content !== $new_content) {
+                        $blocks_changed = true;
+                        error_log("[Block Debug] WYSIWYG content changed at index $index");
+                        error_log("[Block Debug] Current content: " . $current_content);
+                        error_log("[Block Debug] New content: " . $new_content);
+                        break;
+                    }
+                } else {
+                    // For non-WYSIWYG blocks, compare all fields except posts array order
+                    $current_block_compare = $current_block;
+                    $new_block_compare = $new_block;
+                    
+                    // Sort posts arrays if they exist to ensure consistent comparison
+                    if (isset($current_block_compare['posts']) && is_array($current_block_compare['posts'])) {
+                        ksort($current_block_compare['posts']);
+                    }
+                    if (isset($new_block_compare['posts']) && is_array($new_block_compare['posts'])) {
+                        ksort($new_block_compare['posts']);
+                    }
+                    
+                    if (serialize($current_block_compare) !== serialize($new_block_compare)) {
+                        $blocks_changed = true;
+                        error_log("[Block Debug] Block changed at index $index");
+                        break;
+                    }
+                }
+            }
+        }
+        
+        if ($blocks_changed) {
             $save_result = update_option("newsletter_blocks_$newsletter_slug", $sanitized_blocks);
             error_log("[WYSIWYG Debug] Blocks changed, saving to DB");
             

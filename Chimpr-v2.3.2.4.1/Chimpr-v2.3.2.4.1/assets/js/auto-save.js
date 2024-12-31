@@ -1,5 +1,7 @@
 (function($) {
     let autoSaveInitialized = false;
+    let isSaving = false;
+    let pendingChanges = false;
 
     // Debounce function implementation
     function debounce(func, wait) {
@@ -72,18 +74,16 @@
             if (blockType === 'wysiwyg') {
                 var editorId = $block.find('.wysiwyg-editor-content').attr('id');
                 if (window.tinyMCE && window.tinyMCE.get(editorId)) {
-                    window.tinyMCE.get(editorId).save();
-                    blockData.wysiwyg = window.tinyMCE.get(editorId).getContent();
-                    if (!blockData.wysiwyg || blockData.wysiwyg === '<p></p>' || blockData.wysiwyg.trim() === '') {
-                        console.log('Skipping empty WYSIWYG block');
-                        return;
+                    try {
+                        window.tinyMCE.get(editorId).save();
+                        blockData.wysiwyg = window.tinyMCE.get(editorId).getContent();
+                        // Don't skip empty blocks - they might be intentionally cleared
+                    } catch(e) {
+                        console.error('TinyMCE error:', e);
+                        blockData.wysiwyg = $block.find('.wysiwyg-editor-content').val() || '';
                     }
                 } else {
                     blockData.wysiwyg = $block.find('.wysiwyg-editor-content').val() || '';
-                    if (!blockData.wysiwyg.trim()) {
-                        console.log('Skipping empty WYSIWYG block (fallback)');
-                        return;
-                    }
                 }
             }
 
@@ -97,6 +97,14 @@
     function autoSave() {
         console.log('Auto-save triggered');
         
+        if (isSaving) {
+            console.log('Save already in progress, queuing changes');
+            pendingChanges = true;
+            return;
+        }
+        
+        isSaving = true;
+        
         // Save editor content first
         saveAllEditors();
         
@@ -104,6 +112,7 @@
         var blocks = collectBlockData();
         if (!blocks || !blocks.length) {
             console.error('No valid blocks data collected for auto-save');
+            isSaving = false;
             return;
         }
 
@@ -146,6 +155,14 @@
                 console.error('Auto-save error:', error);
                 console.error('XHR:', xhr.responseText);
                 console.error('Blocks JSON sent:', blocksJson);
+            },
+            complete: function() {
+                isSaving = false;
+                if (pendingChanges) {
+                    console.log('Processing pending changes');
+                    pendingChanges = false;
+                    setTimeout(debouncedAutoSave, 100); // Slight delay before processing pending changes
+                }
             }
         });
     }
@@ -153,6 +170,13 @@
     // Manual save function (for save button)
     window.saveBlocks = function() {
         console.log('Manual save triggered');
+        
+        if (isSaving) {
+            console.log('Save in progress, please wait...');
+            return;
+        }
+        
+        isSaving = true;
         
         // Save editor content first
         saveAllEditors();
@@ -162,6 +186,7 @@
         
         if (!blocks || !blocks.length) {
             console.error('No valid blocks data collected');
+            isSaving = false;
             return;
         }
 
@@ -208,6 +233,9 @@
                 console.error('XHR:', xhr.responseText);
                 console.error('Blocks JSON sent:', blocksJson);
                 alert('An error occurred while saving blocks. Please try again.');
+            },
+            complete: function() {
+                isSaving = false;
             }
         });
     };

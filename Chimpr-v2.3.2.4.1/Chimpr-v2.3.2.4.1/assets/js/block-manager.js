@@ -290,9 +290,12 @@
 
     // Utility functions for post data handling
     function collectBlockData($block, isManual) {
+        var title = $block.find('.block-title-input').val();
+        console.log('Collecting block title:', title);
+        
         return {
             type: $block.find('.block-type').val(),
-            title: $block.find('.block-title-input').val(),
+            title: title,
             show_title: $block.find('.show-title-toggle').prop('checked') ? 1 : 0,
             template_id: $block.find('.block-template').val(),
             category: $block.find('.block-category').val(),
@@ -324,19 +327,51 @@
     }
 
     function saveBlockState($block, isManual, callback) {
-        var blockIndex = $block.data('index');
         var blocks = [];
-        blocks[blockIndex] = {
-            type: $block.find('.block-type').val(),
-            title: $block.find('.block-title-input').val(),
-            show_title: $block.find('.show-title-toggle').prop('checked') ? 1 : 0,
-            template_id: $block.find('.block-template').val(),
-            category: $block.find('.block-category').val(),
-            date_range: $block.find('.block-date-range').val(),
-            story_count: $block.find('.block-story-count').val(),
-            manual_override: isManual ? 1 : 0,
-            posts: collectPostData($block)
-        };
+        
+        // Collect all blocks
+        $('#blocks-container .block-item').each(function(index) {
+            var $currentBlock = $(this);
+            var blockType = $currentBlock.find('.block-type').val();
+            var title = $currentBlock.find('.block-title-input').val();
+            console.log('Saving block title:', title);
+            
+            // Build the base block data
+            var blockData = {
+                type: blockType,
+                title: title,
+                show_title: $currentBlock.find('.show-title-toggle').prop('checked') ? 1 : 0,
+                template_id: $currentBlock.find('.block-template').val() || '0',
+                category: $currentBlock.find('.block-category').val() || '',
+                date_range: $currentBlock.find('.block-date-range').val() || '7',
+                story_count: $currentBlock.find('.block-story-count').val() || 'disable',
+                manual_override: $currentBlock.find('input[name*="[manual_override]"]').prop('checked') ? 1 : 0,
+                posts: collectPostData($currentBlock)
+            };
+            
+            // Handle WYSIWYG blocks
+            if (blockType === 'wysiwyg') {
+                var editorId = $currentBlock.find('.wysiwyg-editor-content').attr('id');
+                if (window.tinyMCE && window.tinyMCE.get(editorId)) {
+                    try {
+                        window.tinyMCE.get(editorId).save();
+                        blockData.wysiwyg = window.tinyMCE.get(editorId).getContent() || '';
+                    } catch(e) {
+                        console.error('TinyMCE error:', e);
+                        blockData.wysiwyg = $currentBlock.find('.wysiwyg-editor-content').val() || '';
+                    }
+                } else {
+                    blockData.wysiwyg = $currentBlock.find('.wysiwyg-editor-content').val() || '';
+                }
+            }
+            
+            // Handle HTML blocks
+            if (blockType === 'html') {
+                blockData.html = $currentBlock.find('.html-block textarea').val() || '';
+            }
+            
+            blocks.push(blockData);
+        });
 
         return $.ajax({
             url: newsletterData.ajaxUrl,
@@ -515,6 +550,18 @@
 
     // Event handlers for blocks
     function setupBlockEventHandlers(block) {
+        // Title change handler
+        block.find('.block-title-input').off('change keyup paste input').on('change keyup paste input', function() {
+            if (isUpdateInProgress()) return;
+            
+            console.log('Title changed:', $(this).val());
+            setUpdateInProgress(true);
+            setTimeout(() => {
+                updatePreview('title_change');
+                setUpdateInProgress(false);
+            }, 250);
+        });
+
         // Initialize WYSIWYG editors in this block
         block.find('.wysiwyg-editor-content').each(function() {
             var editorId = $(this).attr('id');

@@ -22,10 +22,66 @@
 **Solution**: Fixed data sanitization and handling in the save operation to prevent double unslashing of content.
 **Details**: See `/knowledge-base/features/saving-blocks.md` and `/knowledge-base/2024/12/blocks-save-issue-20241230-1514.md`
 
-### WYSIWYG Content Not Persisting After Refresh (v2.3.2.4)
-**Issue**: WYSIWYG block content was not persisting after page reloads without explicit saving, despite being saved correctly.
-**Solution**: Separated auto-save from preview generation, fixed type handling in server-side code, and improved content preservation logic.
+### WYSIWYG Content Not Persisting After Refresh (v2.3.2.4.1)
+**Issue**: WYSIWYG block content was not persisting after page reloads, particularly when blocks were reordered or modified.
+**Root Cause**: Block comparison logic was too strict, using direct serialization comparison which failed due to minor HTML formatting differences.
+**Solution**: 
+1. Implemented specialized comparison for WYSIWYG blocks:
+   - Normalize content using trim() and wp_kses_post()
+   - Compare normalized content instead of raw serialization
+   - Added detailed logging for content changes
+2. Improved block change detection:
+   - Check block count changes
+   - Compare block types separately
+   - Handle WYSIWYG content with special comparison
+   - Maintain strict comparison for other block types
+
+**Critical Implementation Notes**:
+1. Block Comparison Rules:
+   ```php
+   // WYSIWYG blocks - normalize and compare content
+   if ($block['type'] === 'wysiwyg') {
+       $current = trim(wp_kses_post($current_content));
+       $new = trim(wp_kses_post($new_content));
+       $changed = ($current !== $new);
+   }
+   // Other blocks - use strict serialization
+   else {
+       $changed = (serialize($current) !== serialize($new));
+   }
+   ```
+
+2. Change Detection Hierarchy:
+   - Block count changes must be checked first
+   - Block type changes indicate structural modification
+   - Content-specific comparison for WYSIWYG
+   - Index preservation for block order
+
+3. Prevention Measures:
+   - Never use direct serialization for WYSIWYG content
+   - Always normalize before comparison
+   - Preserve intentional whitespace
+   - Track content length changes
+   - Verify block count consistency
+   - Maintain block type integrity
+   - Handle empty content cases
+   - Verify after every save
+   - Compare normalized content
+   - Log all state changes
+
 **Details**: See `/knowledge-base/2024/12/wysiwyg-persistence-issue-20241230-1515.md`
+
+### Blocks Save Operation Failing (v2.3.2.4.1)
+**Issue**: Newsletter blocks were failing to save, particularly with WYSIWYG content.
+**Root Cause**: 
+1. Strict serialization comparison failed to handle HTML formatting variations
+2. Block comparison didn't account for intentional whitespace/formatting differences
+**Solution**: 
+1. Implemented block-type-specific comparison logic
+2. Added normalized content comparison for WYSIWYG blocks
+3. Maintained strict comparison for non-WYSIWYG blocks
+4. Enhanced logging to track block changes
+**Details**: See `/knowledge-base/features/saving-blocks.md` and `/knowledge-base/2024/12/blocks-save-issue-20241230-1514.md`
 
 ---
 

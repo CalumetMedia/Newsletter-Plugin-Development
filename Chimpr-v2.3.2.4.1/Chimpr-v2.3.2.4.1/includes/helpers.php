@@ -16,129 +16,53 @@ if (!function_exists('get_newsletter_posts')) {
                 continue;
             }
 
-            $template_id = isset($block['template_id']) ? sanitize_text_field($block['template_id']) : 'default';
-            $show_title  = isset($block['show_title']) ? (bool)$block['show_title'] : true;
-            $block_title = !empty($block['title']) ? sanitize_text_field($block['title']) : '';
-            $story_count = isset($block['story_count']) ? $block['story_count'] : 'disable';
-            $manual_override = isset($block['manual_override']) ? (bool)$block['manual_override'] : false;
+            $current_block = [
+                'type'        => $block['type'],
+                'title'       => isset($block['title']) ? stripslashes(sanitize_text_field($block['title'])) : '',
+                'block_title' => isset($block['title']) ? stripslashes(sanitize_text_field($block['title'])) : '',
+                'show_title'  => isset($block['show_title']) ? (bool)$block['show_title'] : true,
+                'template_id' => isset($block['template_id']) ? sanitize_text_field($block['template_id']) : 'default',
+                'category'    => isset($block['category']) ? sanitize_text_field($block['category']) : '',
+                'date_range'  => isset($block['date_range']) ? $block['date_range'] : '',
+                'story_count' => isset($block['story_count']) ? $block['story_count'] : 'disable',
+                'manual_override' => isset($block['manual_override']) ? (bool)$block['manual_override'] : false,
+                'posts'       => []
+            ];
 
             switch ($block['type']) {
                 case 'content':
                     if (!empty($block['posts'])) {
-                        $current_block = [
-                            'type'        => 'content',
-                            'block_title' => $block_title,
-                            'show_title'  => $show_title,
-                            'post_count'  => isset($block['post_count']) ? intval($block['post_count']) : 5,
-                            'date_range'  => isset($block['date_range']) ? intval($block['date_range']) : 7,
-                            'end_date'    => isset($block['end_date']) ? $block['end_date'] : '',
-                            'start_date'  => isset($block['start_date']) ? $block['start_date'] : '',
-                            'posts'       => [],
-                            'template_id' => $template_id
-                        ];
-
-                        // Convert posts array to a sortable array with order
-                        $sorted_posts = [];
-                        
-                        // Get all selected posts
                         foreach ($block['posts'] as $post_id => $post_data) {
-                            // Validate post data structure
-                            if (!is_array($post_data)) {
-                                error_log("Invalid post data structure for post ID: $post_id");
-                                continue;
-                            }
-
-                            // Normalize checked value and only store checked posts
-                            if ((isset($post_data['checked']) && $post_data['checked'] === '1') || 
-                                (isset($post_data['selected']) && $post_data['selected'] === '1')) {
-                                // Ensure order is a valid integer
-                                $order = isset($post_data['order']) ? intval($post_data['order']) : PHP_INT_MAX;
-                                if ($order < 0) {
-                                    $order = PHP_INT_MAX;
-                                }
-                                
-                                $sorted_posts[] = [
-                                    'id' => $post_id,
-                                    'order' => $order
+                            if (isset($post_data['checked']) && $post_data['checked']) {
+                                $current_block['posts'][$post_id] = [
+                                    'checked' => '1',
+                                    'order' => isset($post_data['order']) ? $post_data['order'] : '0'
                                 ];
                             }
-                        }
-                        
-                        // Sort posts by order
-                        usort($sorted_posts, function($a, $b) {
-                            return $a['order'] - $b['order'];
-                        });
-                        
-                        // Apply story count limit if not 'disable' and not in manual override mode
-                        if (!$manual_override && $story_count !== 'disable') {
-                            $count = intval($story_count);
-                            if ($count > 0) {
-                                $sorted_posts = array_slice($sorted_posts, 0, $count);
-                            } else {
-                                error_log("Invalid story count value: $story_count");
-                            }
-                        }
-
-                        // Process sorted posts
-                        foreach ($sorted_posts as $sorted_post) {
-                            $post_id = $sorted_post['id'];
-                            $post = get_post($post_id);
-                            if ($post) {
-                                $current_block['posts'][] = [
-                                    'title'         => get_the_title($post_id),
-                                    'content'       => apply_filters('the_content', $post->post_content),
-                                    'excerpt'       => get_the_excerpt($post),
-                                    'thumbnail_url' => get_the_post_thumbnail_url($post_id, 'full') ?: '',
-                                    'permalink'     => get_permalink($post_id),
-                                    'author_id'     => $post->post_author,
-                                    'author_name'   => get_the_author_meta('display_name', $post->post_author),
-                                    'ID'            => $post_id
-                                ];
-                                error_log("Successfully processed post ID: $post_id with order: " . $sorted_post['order']);
-                            } else {
-                                error_log("Failed to get post with ID: $post_id");
-                            }
-                        }
-
-                        if (!empty($current_block['posts'])) {
-                            $newsletter_data[] = $current_block;
-                            error_log("Added block with " . count($current_block['posts']) . " posts to newsletter data");
                         }
                     }
+                    error_log("Added content block to newsletter data");
                     break;
 
                 case 'html':
-                    if (isset($block['html'])) {
-                        $newsletter_data[] = [
-                            'type'        => 'html',
-                            'block_title' => $block_title,
-                            'show_title'  => $show_title,
-                            'html'        => wp_kses_post(wp_unslash($block['html'])),
-                            'template_id' => $template_id
-                        ];
-                    }
+                    $current_block['html'] = isset($block['html']) ? wp_kses_post(stripslashes($block['html'])) : '';
+                    error_log("Added HTML block to newsletter data");
                     break;
 
                 case 'wysiwyg':
-                    if (isset($block['wysiwyg'])) {
-                        $content = $block['wysiwyg'];
-                        $content = wp_unslash($content);
-                        if (!empty($content)) {
-                            if (strpos($content, '<p>') === false) {
-                                $content = wpautop($content);
-                            }
-                            $newsletter_data[] = [
-                                'type'        => 'wysiwyg',
-                                'block_title' => $block_title,
-                                'show_title'  => $show_title,
-                                'wysiwyg'     => wp_kses_post($content)
-                            ];
-                        }
+                    $content = isset($block['wysiwyg']) ? stripslashes($block['wysiwyg']) : '';
+                    if (!empty($content) && strpos($content, '<p>') === false) {
+                        $content = wpautop($content);
                     }
+                    $current_block['wysiwyg'] = wp_kses_post($content);
+                    error_log("Added WYSIWYG block to newsletter data. Content length: " . strlen($content));
                     break;
             }
+
+            $newsletter_data[] = $current_block;
         }
 
+        error_log("Final newsletter data contains " . count($newsletter_data) . " blocks");
         return $newsletter_data;
     }
 }
@@ -167,8 +91,9 @@ if (!function_exists('newsletter_generate_preview_content')) {
         foreach ($newsletter_posts as $block_data) {
             $newsletter_html .= '<div class="newsletter-block">';
 
-            if (!empty($block_data['block_title']) && $block_data['show_title']) {
-                $newsletter_html .= '<h2>' . esc_html(wp_unslash($block_data['block_title'])) . '</h2>';
+            if ($block_data['show_title'] && (!empty($block_data['block_title']) || !empty($block_data['title']))) {
+                $title = !empty($block_data['block_title']) ? $block_data['block_title'] : $block_data['title'];
+                $newsletter_html .= '<h2>' . esc_html($title) . '</h2>';
             }
 
             if ($block_data['type'] === 'content') {
@@ -193,16 +118,22 @@ if (!function_exists('newsletter_generate_preview_content')) {
                 }
 
                 if (!empty($block_data['posts'])) {
-                    foreach ($block_data['posts'] as $post_data) {
-                        if (!is_array($post_data) || empty($post_data['ID'])) {
-                            error_log("Invalid post data structure in preview generation");
+                    foreach ($block_data['posts'] as $post_id => $post_data) {
+                        if (!isset($post_data['checked']) || !$post_data['checked']) {
+                            continue;
+                        }
+
+                        $post = get_post($post_id);
+                        if (!$post) {
+                            error_log("Post not found: $post_id");
                             continue;
                         }
 
                         $block_content = $template_content;
+                        $thumbnail_url = get_the_post_thumbnail_url($post_id, 'full');
 
                         // Handle conditional thumbnail tags
-                        if (!empty($post_data['thumbnail_url'])) {
+                        if (!empty($thumbnail_url)) {
                             $block_content = preg_replace('/\{if_thumbnail\}(.*?)\{\/if_thumbnail\}/s', '$1', $block_content);
                         } else {
                             $block_content = preg_replace('/\{if_thumbnail\}.*?\{\/if_thumbnail\}/s', '', $block_content);
@@ -210,19 +141,19 @@ if (!function_exists('newsletter_generate_preview_content')) {
 
                         try {
                             $replacements = [
-                                '{title}'         => esc_html($post_data['title']),
-                                '{content}'       => wp_kses_post($post_data['content']),
-                                '{thumbnail_url}' => esc_url($post_data['thumbnail_url']),
-                                '{permalink}'     => esc_url($post_data['permalink']),
-                                '{excerpt}'       => wp_kses_post(!empty($post_data['excerpt']) ? $post_data['excerpt'] : wp_trim_words($post_data['content'], 55)),
-                                '{author}'        => esc_html($post_data['author_name']),
-                                '{publish_date}'  => esc_html(get_the_date('', $post_data['ID'])),
-                                '{categories}'    => esc_html(implode(', ', wp_get_post_categories($post_data['ID'], ['fields' => 'names'])))
+                                '{title}'         => esc_html($post->post_title),
+                                '{content}'       => wp_kses_post($post->post_content),
+                                '{thumbnail_url}' => esc_url($thumbnail_url),
+                                '{permalink}'     => esc_url(get_permalink($post_id)),
+                                '{excerpt}'       => wp_kses_post(get_the_excerpt($post)),
+                                '{author}'        => esc_html(get_the_author_meta('display_name', $post->post_author)),
+                                '{publish_date}'  => esc_html(get_the_date('', $post_id)),
+                                '{categories}'    => esc_html(implode(', ', wp_get_post_categories($post_id, ['fields' => 'names'])))
                             ];
 
                             $newsletter_html .= strtr($block_content, $replacements);
                         } catch (Exception $e) {
-                            error_log("Error processing post ID: " . $post_data['ID'] . " - " . $e->getMessage());
+                            error_log("Error processing post ID: $post_id - " . $e->getMessage());
                             continue;
                         }
                     }

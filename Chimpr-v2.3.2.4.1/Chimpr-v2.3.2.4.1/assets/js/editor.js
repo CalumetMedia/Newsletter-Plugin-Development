@@ -17,8 +17,9 @@
                         wpautop: true,
                         plugins: 'paste,lists,link,textcolor,wordpress,wplink,hr,charmap,wptextpattern',
                         toolbar1: 'formatselect,bold,italic,bullist,numlist,link,unlink,forecolor,hr',
-                        // Critical settings for proper quote handling
+                        // Critical settings for proper quote and character handling
                         entity_encoding: 'raw',
+                        encoding: 'xml',
                         verify_html: false,
                         entities: '160,nbsp',
                         fix_list_elements: true,
@@ -27,12 +28,17 @@
                         remove_linebreaks: false,
                         convert_newlines_to_brs: false,
                         remove_redundant_brs: false,
+                        // Add these settings
+                        valid_elements: '*[*]',
+                        extended_valid_elements: '*[*]',
+                        keep_styles: true,
                         setup: function(editor) {
                             // Initialize editor content
                             editor.on('init', function() {
                                 console.log('Editor initialized:', editorId);
                                 // Restore content after initialization
                                 if (currentContent) {
+                                    currentContent = currentContent.replace(/\\/g, '');
                                     if (currentContent.indexOf('<p>') === -1) {
                                         currentContent = switchEditors.wpautop(currentContent);
                                     }

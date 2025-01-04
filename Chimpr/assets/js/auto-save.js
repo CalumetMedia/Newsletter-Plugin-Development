@@ -1,11 +1,9 @@
 // auto-save.js
 (function($) {
-    // Global initialization tracking
     let autoSaveInitialized = false;
     let isSaving = false;
     let pendingChanges = false;
 
-    // Enhanced state management
     window.editorState = {
         contentVersions: {},
         pendingSaves: new Set(),
@@ -13,7 +11,6 @@
         initialized: false
     };
 
-    // Debounce function implementation
     function debounce(func, wait) {
         let timeout;
         return function(...args) {
@@ -22,7 +19,6 @@
         };
     }
 
-    // Save all TinyMCE editors before collecting block data
     function saveAllEditors() {
         if (typeof tinymce !== 'undefined') {
             tinymce.editors.forEach(function(editor) {
@@ -32,7 +28,6 @@
                     const content = editor.getContent();
                     const key = `wysiwyg_${editorId}`;
                     
-                    // Only mark as pending if content has changed
                     if (window.editorState.lastSavedContent[key] !== content) {
                         window.editorState.pendingSaves.add(key);
                     }
@@ -41,7 +36,6 @@
         }
     }
 
-    // Collect block data for saving
     function collectBlockData() {
         var blocks = [];
         $('.block-item').each(function() {
@@ -83,7 +77,6 @@
                 
                 if (tinymce.get(editorId)) {
                     blockData.wysiwyg = tinymce.get(editorId).getContent();
-                    // Track content version
                     window.editorState.contentVersions[key] = (window.editorState.contentVersions[key] || 0) + 1;
                     blockData.content_version = window.editorState.contentVersions[key];
                 } else {
@@ -93,7 +86,6 @@
             else if (blockType === 'html') {
                 const key = `html_${blockIndex}`;
                 blockData.html = block.find('textarea[name*="[html]"]').val() || '';
-                // Track content version
                 window.editorState.contentVersions[key] = (window.editorState.contentVersions[key] || 0) + 1;
                 blockData.content_version = window.editorState.contentVersions[key];
             }
@@ -103,7 +95,6 @@
         return blocks;
     }
 
-    // Enhanced auto-save function
     function autoSave() {
         if (isSaving) {
             pendingChanges = true;
@@ -127,7 +118,6 @@
             },
             success: function(response) {
                 if (response.success) {
-                    // Update last saved content for each block
                     blocks.forEach(function(block, index) {
                         if (block.type === 'wysiwyg') {
                             const key = `wysiwyg_wysiwyg-editor-${index}`;
@@ -151,10 +141,8 @@
         });
     }
 
-    // Manual save function
     window.saveBlocks = function() {
         if (isSaving) {
-            console.log('Save in progress, please wait...');
             return;
         }
         
@@ -163,15 +151,12 @@
         
         var blocks = collectBlockData();
         if (!blocks || !blocks.length) {
-            console.error('No valid blocks data collected');
             isSaving = false;
             return;
         }
 
-        // Convert blocks to JSON string
         var blocksJson = JSON.stringify(blocks);
 
-        // Prepare form data
         var formData = new FormData();
         formData.append('action', 'save_newsletter_blocks');
         formData.append('security', newsletterData.nonceSaveBlocks);
@@ -190,7 +175,6 @@
             contentType: false,
             success: function(response) {
                 if (response.success) {
-                    // Update last saved content
                     blocks.forEach(function(block, index) {
                         if (block.type === 'wysiwyg') {
                             const key = `wysiwyg_wysiwyg-editor-${index}`;
@@ -208,12 +192,10 @@
                         window.updatePreview(true);
                     }
                 } else {
-                    console.error('Save failed:', response);
                     alert(response.data && response.data.message ? response.data.message : 'An error occurred while saving blocks.');
                 }
             },
-            error: function(xhr, status, error) {
-                console.error('Save error:', error);
+            error: function() {
                 alert('An error occurred while saving blocks. Please try again.');
             },
             complete: function() {
@@ -222,62 +204,17 @@
         });
     };
 
-    // Create debounced version of autoSave
     const debouncedAutoSave = debounce(autoSave, 1000);
 
-    // Set up event listeners
     function initializeAutoSave() {
-        console.log('[Debug Race] Auto-save initialization started', new Date().getTime());
-        
-        window.debouncedAutoSave = _.debounce(function(source) {
-            console.log('[Debug Race] Auto-save triggered from:', source, 'Time:', new Date().getTime());
-            
-            // Ensure all editors are saved
-            if (typeof tinymce !== 'undefined') {
-                tinymce.triggerSave();
-                console.log('[Debug Race] TinyMCE triggerSave called', new Date().getTime());
-            }
-            
-            // Collect form data
-            var formData = new FormData($('#newsletter-form')[0]);
-            console.log('[Debug Race] Form data collected, size:', formData.entries().length, 'Time:', new Date().getTime());
-            
-            // Log WYSIWYG content lengths before save
-            $('.wysiwyg-editor-content').each(function() {
-                var editorId = $(this).attr('id');
-                console.log('[Debug Race] Pre-save content length for', editorId, ':', $(this).val().length, 'Time:', new Date().getTime());
-            });
-            
-            $.ajax({
-                url: window.ajaxurl,
-                type: 'POST',
-                data: formData,
-                processData: false,
-                contentType: false,
-                success: function(response) {
-                    console.log('[Debug Race] Auto-save completed', new Date().getTime(), 'Response:', response.success);
-                    if (response.success) {
-                        // Log content lengths after save
-                        $('.wysiwyg-editor-content').each(function() {
-                            var editorId = $(this).attr('id');
-                            console.log('[Debug Race] Post-save content length for', editorId, ':', $(this).val().length, 'Time:', new Date().getTime());
-                        });
-                    }
-                }
-            });
-        }, 1000);
-
         if (autoSaveInitialized) return;
         autoSaveInitialized = true;
 
-        // Initialize content tracking
         window.editorState.initialized = true;
 
-        // Listen for changes on block container and form fields
         $('#blocks-container').on('change input', 'input, select, textarea', function(event) {
             const $target = $(event.target);
-            
-            // Don't trigger auto-save for story selection changes
+
             if ($target.is('input[type="checkbox"][name*="[posts]"]')) {
                 return;
             }
@@ -285,7 +222,6 @@
             debouncedAutoSave();
         });
 
-        // Set up TinyMCE change handlers
         if (window.tinyMCE) {
             window.tinyMCE.on('AddEditor', function(e) {
                 e.editor.on('change keyup paste', function() {
@@ -295,18 +231,15 @@
             });
         }
 
-        // Handle page unload
         $(window).on('beforeunload', function() {
             if (window.editorState.pendingSaves.size > 0) {
                 return 'Changes you made may not be saved.';
             }
         });
 
-        // Initial auto-save
         setTimeout(autoSave, 1000);
     }
 
-    // Initialize when document and TinyMCE are ready
     $(document).ready(function() {
         if (window.tinyMCE) {
             window.tinyMCE.on('init', function() {

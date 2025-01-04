@@ -5,7 +5,45 @@
 
 ## Current Issues
 
-### 1. WYSIWYG Editor Content Not Saving
+### 1. HTML Block Content Reset Issue
+**Status**: Fixed
+**Priority**: High
+**Component**: Block Management System
+
+#### Related Recent Bug Fixes
+- Fixed HTML block content loss during reset operation (v2.3.2.4.3)
+  - Identified HTML content loss during block sanitization
+  - Implemented HTML content preservation in sanitization process
+  - Added logging for HTML content tracking
+  - Enhanced block data processing
+
+#### Root Cause Analysis
+The HTML content loss during reset was caused by:
+1. Sanitization process not including HTML content in sanitized block array
+2. No specific preservation logic for HTML block content
+3. Missing HTML field in block data structure after sanitization
+
+#### Solution Implementation
+- Modified block sanitization logic to:
+  1. Detect HTML block types during processing
+  2. Preserve HTML content during sanitization
+  3. Include HTML content in final sanitized block data
+  4. Added detailed logging for content tracking
+- Location: `includes/form-handlers.php`
+
+#### Key Variables & Functions to Check
+- `newsletter_stories_handle_form_submission()` - Form processing
+- `$sanitized_block['html']` - HTML content storage
+- Block type detection and processing
+- Content preservation logic
+
+#### Monitoring Points
+1. Reset button functionality
+2. HTML block content preservation
+3. Block sanitization process
+4. Error logging patterns
+
+### 2. WYSIWYG Editor Content Not Saving
 **Status**: Fixed
 **Priority**: High
 **Component**: Block Management System
@@ -56,7 +94,7 @@ The WYSIWYG content loss during preview generation was caused by:
 4. Error logging patterns
 5. Memory management for editor instances
 
-### 2. Add Newsletter Navigation Issue
+### 3. Add Newsletter Navigation Issue
 **Status**: Active
 **Priority**: Medium
 **Component**: Navigation System
@@ -83,7 +121,7 @@ No directly related recent fixes found in KNOWN_ISSUES.md
 4. Session state management during creation
 5. Permission verification sequence
 
-### 3. PDF Generation System Failure
+### 4. PDF Generation System Failure
 **Status**: Active
 **Priority**: High
 **Component**: PDF Generation System
@@ -117,7 +155,7 @@ No directly related recent fixes found in KNOWN_ISSUES.md
 5. Content sanitization methods
 6. TCPDF configuration settings
 
-### 4. Campaign Table Performance Issues
+### 5. Campaign Table Performance Issues
 **Status**: Active
 **Priority**: High
 **Component**: Campaign Management System

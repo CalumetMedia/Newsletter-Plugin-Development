@@ -480,14 +480,19 @@ jQuery(document).ready(function($) {
 jQuery(document).ready(function($) {
     $('#reset-blocks').on('click', function(e) {
         e.preventDefault();
+        console.log('Reset button clicked');
         const confirmed = confirm("Do you want to reset the newsletter to it's default state?");
         if (confirmed) {
+            console.log('Reset confirmed');
             const resetInput = $('<input>').attr({
                 type: 'hidden',
                 name: 'reset_blocks',
                 value: '1'
             });
-            $('#blocks-form').append(resetInput).submit();
+            console.log('Adding reset input to form');
+            $('#blocks-form').append(resetInput);
+            console.log('Form data before submit:', $('#blocks-form').serializeArray());
+            $('#blocks-form').submit();
         }
     });
 });

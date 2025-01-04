@@ -36,7 +36,6 @@ function newsletter_generate_preview() {
         // Get saved blocks
         $saved_blocks = get_option("newsletter_blocks_$newsletter_slug", []);
         if (!is_array($saved_blocks)) {
-            error_log('Invalid saved blocks format in database');
             wp_send_json_error('Invalid blocks format in database');
             return;
         }
@@ -60,12 +59,10 @@ function newsletter_generate_preview() {
         if (isset($_POST['saved_selections'])) {
             $decoded = json_decode(stripslashes($_POST['saved_selections']), true);
             if (json_last_error() !== JSON_ERROR_NONE) {
-                error_log('Preview generation - JSON decode error: ' . json_last_error_msg());
                 wp_send_json_error('Invalid saved selections format');
                 return;
             }
             if (!is_array($decoded)) {
-                error_log('Preview generation - Invalid saved selections structure');
                 wp_send_json_error('Invalid saved selections structure');
                 return;
             }
@@ -73,18 +70,15 @@ function newsletter_generate_preview() {
             // Validate each block's structure
             foreach ($decoded as $block_index => $block_data) {
                 if (!is_array($block_data)) {
-                    error_log("Invalid block data structure for index $block_index");
                     continue;
                 }
                 
                 if (!isset($block_data['type'])) {
-                    error_log("Missing block type for index $block_index");
                     continue;
                 }
                 
                 // Specific validation for WYSIWYG blocks
                 if ($block_data['type'] === 'wysiwyg' && !isset($block_data['wysiwyg'])) {
-                    error_log("WYSIWYG content missing for block $block_index");
                     // Initialize empty WYSIWYG content rather than skipping
                     $block_data['wysiwyg'] = '';
                 }
@@ -93,11 +87,8 @@ function newsletter_generate_preview() {
             }
         }
 
-        error_log('Saved selections: ' . print_r($saved_selections, true));
-
         // Merge saved selections into blocks
         foreach ($saved_selections as $block_index => $block_data) {
-            error_log("Processing block $block_index: " . print_r($block_data, true));
             
             if (!isset($saved_blocks[$block_index])) {
                 $saved_blocks[$block_index] = [];
@@ -105,23 +96,18 @@ function newsletter_generate_preview() {
             
             // Handle WYSIWYG content
             if (isset($block_data['type']) && $block_data['type'] === 'wysiwyg') {
-                error_log("Processing WYSIWYG block $block_index");
                 
                 $saved_blocks[$block_index]['type'] = 'wysiwyg';
                 
                 // Check if WYSIWYG content exists in new data
                 if (!empty($block_data['wysiwyg'])) {
-                    error_log("Using new WYSIWYG content for block $block_index");
                     $saved_blocks[$block_index]['wysiwyg'] = wp_kses_post($block_data['wysiwyg']);
                 } else {
                     // Preserve existing WYSIWYG content if present
-                    error_log("Checking for existing WYSIWYG content in block $block_index");
                     $existing_blocks = get_option("newsletter_blocks_$newsletter_slug", []);
                     if (isset($existing_blocks[$block_index]['wysiwyg'])) {
-                        error_log("Preserving existing WYSIWYG content for block $block_index");
                         $saved_blocks[$block_index]['wysiwyg'] = $existing_blocks[$block_index]['wysiwyg'];
                     } else {
-                        error_log("No WYSIWYG content found for block $block_index");
                         $saved_blocks[$block_index]['wysiwyg'] = '';
                     }
                 }
@@ -146,7 +132,6 @@ function newsletter_generate_preview() {
                         // Store the template content as if it was HTML content
                         $saved_blocks[$block_index]['html'] = wp_kses_post($available_templates[$template_id]['html']);
                     } else {
-                        error_log("Template not found for PDF Link block: $template_id");
                         $saved_blocks[$block_index]['html'] = ''; // Empty if template not found
                     }
                 }
@@ -179,12 +164,9 @@ function newsletter_generate_preview() {
             }
         }
 
-        error_log('Merged blocks: ' . print_r($saved_blocks, true));
-
         // Generate preview content
         $preview_html = newsletter_generate_preview_content($newsletter_slug, $saved_blocks);
         if ($preview_html === false) {
-            error_log('Error generating preview content');
             wp_send_json_error('Error generating preview content');
             return;
         }
@@ -209,7 +191,6 @@ function newsletter_generate_preview() {
         wp_send_json_success($final_html);
         
     } catch (Exception $e) {
-        error_log('Preview generation error: ' . $e->getMessage());
         wp_send_json_error('Error generating preview: ' . $e->getMessage());
     }
 }

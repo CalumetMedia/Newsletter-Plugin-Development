@@ -105,10 +105,10 @@ if (!function_exists('newsletter_generate_preview_content')) {
         foreach ($newsletter_posts as $block_data) {
             $newsletter_html .= '<div class="newsletter-block" style="margin-bottom: 20px;">';
 
-if ($block_data['show_title']) {
-    $title = !empty($block_data['block_title']) ? $block_data['block_title'] : $block_data['title'];
-    $newsletter_html .= '<h2>' . esc_html($title) . '</h2>';
-}
+            if ($block_data['show_title']) {
+                $title = !empty($block_data['block_title']) ? $block_data['block_title'] : $block_data['title'];
+                $newsletter_html .= '<h2>' . esc_html($title) . '</h2>';
+            }
 
             if ($block_data['type'] === 'content' && !empty($block_data['posts'])) {
                 $template_id = isset($block_data['template_id']) ? $block_data['template_id'] : 'default';
@@ -120,13 +120,11 @@ if ($block_data['show_title']) {
                 } elseif (!empty($template_id) && isset($available_templates[$template_id]) && isset($available_templates[$template_id]['html'])) {
                     $template_content = $available_templates[$template_id]['html'];
                 } else {
-                    error_log("Template not found for ID: $template_id, using default template");
                     if (file_exists(NEWSLETTER_PLUGIN_DIR . 'templates/default-template.php')) {
                         ob_start();
                         include NEWSLETTER_PLUGIN_DIR . 'templates/default-template.php';
                         $template_content = ob_get_clean();
                     } else {
-                        error_log("Default template file not found");
                         $template_content = '<div class="post-content">{title}<br>{content}</div>';
                     }
                 }
@@ -156,7 +154,6 @@ if ($block_data['show_title']) {
 
                         $newsletter_html .= strtr($block_content, $replacements);
                     } catch (Exception $e) {
-                        error_log("Error processing post ID: " . $post->ID . " - " . $e->getMessage());
                         continue;
                     }
                 }
@@ -263,7 +260,6 @@ function handle_wysiwyg_content($block, $existing_block = null) {
     
     // Handle empty content cases with correct 'wysiwyg' key
     if (empty($block['wysiwyg']) && !empty($existing_block['wysiwyg'])) {
-        error_log('[WYSIWYG Debug] Empty content detected, preserving existing content');
         $block['wysiwyg'] = $existing_block['wysiwyg'];
         return $block;
     }
@@ -274,7 +270,6 @@ function handle_wysiwyg_content($block, $existing_block = null) {
         $existing_content = isset($existing_block['wysiwyg']) ? trim($existing_block['wysiwyg']) : '';
         
         if (empty($new_content) || $new_content === '<p></p>') {
-            error_log('[WYSIWYG Debug] Empty content during auto-save, preserving existing content');
             $block['wysiwyg'] = $existing_content;
             return $block;
         }
@@ -284,7 +279,6 @@ function handle_wysiwyg_content($block, $existing_block = null) {
         $normalized_existing = wp_kses_post($existing_content);
         
         if ($normalized_new === $normalized_existing) {
-            error_log('[WYSIWYG Debug] Content unchanged, preserving existing content');
             $block['wysiwyg'] = $existing_content;
             return $block;
         }
@@ -297,7 +291,6 @@ function handle_wysiwyg_content($block, $existing_block = null) {
             $content = wpautop($content);
         }
         $block['wysiwyg'] = wp_kses_post($content);
-        error_log('[WYSIWYG Debug] Content processed, length: ' . strlen($block['wysiwyg']));
     }
     
     return $block;
@@ -311,7 +304,6 @@ function handle_html_content($block, $existing_block = null) {
     
     // Handle empty content cases
     if (empty($block['html']) && !empty($existing_block['html'])) {
-        error_log('Preserving existing HTML content');
         $block['html'] = $existing_block['html'];
     }
     

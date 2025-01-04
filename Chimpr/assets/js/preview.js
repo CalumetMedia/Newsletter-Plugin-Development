@@ -17,7 +17,6 @@
     window.updatePreview = function(trigger = 'manual') {
         // Only update if all data is loaded or if it's a manual update
         if (window.newsletterState && !window.newsletterState.isReady && trigger !== 'manual') {
-            console.log('Skipping preview update - not ready');
             return;
         }
 
@@ -87,13 +86,11 @@
                 if (response.success) {
                     $previewContent.html(response.data);
                 } else {
-                    console.error('Preview generation failed:', response.data);
                     $previewContent.html('<p class="error">Error generating preview</p>');
                 }
             },
             error: function(xhr, status, error) {
                 if (status !== 'abort') {
-                    console.error('Ajax error:', error);
                     $previewContent.html('<p class="error">Error generating preview</p>');
                 }
             },

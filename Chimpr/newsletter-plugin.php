@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name:       Chimpr
- * Description:       Saturday afternoon version
- * Version:           2.3.2.5
+ * Description:       Debug log reset. 
+ * Version:           2.3.2.6
  * Author:            Jon Stewart
  * Text Domain:       chimpr-newsletter
  */
@@ -16,14 +16,13 @@ if (!defined('ABSPATH')) {
  */
 define('NEWSLETTER_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('NEWSLETTER_PLUGIN_URL', plugin_dir_url(__FILE__));
-define('NEWSLETTER_PLUGIN_VERSION', '2.3.2.5');
+define('NEWSLETTER_PLUGIN_VERSION', '2.3.2.6');
 
 /**
  * Load text domain and initialize
  */
 function newsletter_plugin_init() {
     load_plugin_textdomain('chimpr-newsletter', false, dirname(plugin_basename(__FILE__)) . '/languages/');
-    error_log("Plugin Init: Text domain loaded.");
 }
 add_action('plugins_loaded', 'newsletter_plugin_init');
 

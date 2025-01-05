@@ -78,7 +78,7 @@ $block_show_title = isset($block['show_title']) ? $block['show_title'] : false;
             <div class="block-field template-select">
                 <label><?php esc_html_e('Template:', 'newsletter'); ?></label>
                 <select name="blocks[<?php echo esc_attr($index); ?>][template_id]" class="block-template"
-                        <?php echo ($block_type !== 'content') ? 'disabled' : ''; ?>>
+                        <?php echo (!in_array($block_type, ['content', 'pdf_link'])) ? 'disabled' : ''; ?>>
                     <?php
                     foreach ($available_templates as $template_id => $template) {
                         printf(
@@ -172,9 +172,15 @@ $block_show_title = isset($block['show_title']) ? $block['show_title'] : false;
                                            value="1" <?php checked(isset($post['checked']), true); ?>>
                                     <?php if (!empty($post['thumbnail'])): ?>
                                         <img class="post-thumbnail" src="<?php echo esc_url($post['thumbnail']); ?>" 
-                                             alt="<?php echo esc_attr($post['title'] ?? ''); ?>">
+                                             alt="<?php echo esc_attr(isset($post['title']) ? $post['title'] : (isset($post['post_title']) ? $post['post_title'] : '')); ?>">
                                     <?php endif; ?>
-                                    <span class="post-title"><?php echo esc_html($post['title'] ?? ''); ?></span>
+                                    <span class="post-title"><?php 
+                                        if (is_object($post)) {
+                                            echo esc_html($post->post_title);
+                                        } else {
+                                            echo esc_html(isset($post['title']) ? $post['title'] : (isset($post['post_title']) ? $post['post_title'] : ''));
+                                        }
+                                    ?></span>
                                 </label>
                                 <input type="hidden" class="post-order" 
                                        name="blocks[<?php echo esc_attr($index); ?>][posts][<?php echo esc_attr($post_id); ?>][order]" 

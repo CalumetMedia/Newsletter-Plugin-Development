@@ -219,29 +219,55 @@ class Newsletter_Mailchimp_API {
         return isset($response['name']) ? $response['name'] : null;
     }
 
-    public function get_campaigns() {
-        $all_campaigns = [];
-        $offset = 0;
-        $count = 100;
-        while (true) {
-            $response = $this->make_request('campaigns?count=' . $count . '&offset=' . $offset, 'GET');
-            if (is_wp_error($response)) {
-                return $response;
+    public function get_campaigns($offset = 0, $count = 10, $status = null) {
+        $endpoint = 'campaigns?count=' . $count . '&offset=' . $offset;
+        
+        if ($status) {
+            // Handle multiple statuses (e.g., 'save,schedule,paused')
+            $statuses = explode(',', $status);
+            if (count($statuses) > 1) {
+                // For multiple statuses, we need to join them with commas for Mailchimp API
+                $endpoint .= '&status=' . implode(',', array_map('trim', $statuses));
+            } else {
+                $endpoint .= '&status=' . $status;
             }
-
-            if (!isset($response['campaigns']) || empty($response['campaigns'])) {
-                break;
-            }
-
-            $all_campaigns = array_merge($all_campaigns, $response['campaigns']);
-
-            if (count($response['campaigns']) < $count) {
-                break;
-            }
-
-            $offset += $count;
         }
-        return $all_campaigns;
+        
+        error_log('Mailchimp API Request: ' . $endpoint); // Debug log
+        
+        $response = $this->make_request($endpoint, 'GET');
+        if (is_wp_error($response)) {
+            error_log('Mailchimp API Error: ' . $response->get_error_message());
+            return $response;
+        }
+
+        error_log('Mailchimp API Response: ' . print_r($response, true)); // Debug log
+
+        return [
+            'campaigns' => isset($response['campaigns']) ? $response['campaigns'] : [],
+            'total_items' => isset($response['total_items']) ? $response['total_items'] : 0
+        ];
+    }
+
+    public function get_campaign_count($status = null) {
+        $endpoint = 'campaigns?count=1&offset=0';
+        if ($status) {
+            // Handle multiple statuses
+            $statuses = explode(',', $status);
+            if (count($statuses) > 1) {
+                // For multiple statuses, we need to join them with commas
+                $endpoint .= '&status=' . implode(',', array_map('trim', $statuses));
+            } else {
+                $endpoint .= '&status=' . $status;
+            }
+        }
+        
+        $response = $this->make_request($endpoint, 'GET');
+        if (is_wp_error($response)) {
+            return 0;
+        }
+        
+        return isset($response['total_items']) ? $response['total_items'] : 0;
     }
 
     public function get_campaign_info($campaign_id) {

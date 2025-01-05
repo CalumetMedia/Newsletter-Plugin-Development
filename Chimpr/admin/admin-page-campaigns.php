@@ -5,12 +5,11 @@ if (!defined('ABSPATH')) {
 
 function np_render_campaigns_page() {
     $mailchimp_api = new Newsletter_Mailchimp_API();
-    $campaigns = $mailchimp_api->get_campaigns();
-
-    if (is_wp_error($campaigns)) {
-        echo '<div class="error"><p>Error fetching campaigns: ' . esc_html($campaigns->get_error_message()) . '</p></div>';
-        return;
-    }
+    
+    // Pagination settings
+    $items_per_page = 10;
+    $current_page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
+    $offset = ($current_page - 1) * $items_per_page;
 
     // Handle Filtering
     $filter_status = isset($_GET['filter_status']) ? sanitize_text_field($_GET['filter_status']) : '';
@@ -18,34 +17,37 @@ function np_render_campaigns_page() {
     // Handle Sorting
     $orderby = isset($_GET['orderby']) ? sanitize_text_field($_GET['orderby']) : '';
     $order = isset($_GET['order']) ? sanitize_text_field($_GET['order']) : 'desc';
-    $valid_order_values = array('desc', 'desc');
+    $valid_order_values = array('desc', 'asc');
     if (!in_array($order, $valid_order_values, true)) {
         $order = 'desc';
     }
 
-    // Pagination settings
-    $items_per_page = 10;
-    $current_page = isset($_GET['paged']) ? max(1, intval($_GET['paged'])) : 1;
-
-    // Separate campaigns by status
-    $draft_scheduled_paused_campaigns = [];
-    $sent_campaigns = [];
-
-    foreach ($campaigns as $campaign) {
-        if (in_array($campaign['status'], ['save', 'schedule', 'paused'])) {
-            if ($filter_status && $filter_status !== $campaign['status']) {
-                continue;
-            }
-            $draft_scheduled_paused_campaigns[] = $campaign;
-        } elseif ($campaign['status'] === 'sent') {
-            if ($filter_status && $filter_status !== 'sent') {
-                continue;
-            }
-            $sent_campaigns[] = $campaign;
-        }
+    // Get campaigns based on filter
+    if ($filter_status) {
+        // If filtering, just get that status
+        $response = $mailchimp_api->get_campaigns($offset, $items_per_page, $filter_status);
+        $active_campaigns = is_wp_error($response) ? [] : $response['campaigns'];
+        $sent_campaigns = ($filter_status === 'sent') ? $active_campaigns : [];
+        $active_campaigns = ($filter_status !== 'sent') ? $active_campaigns : [];
+        
+        $total_active = ($filter_status !== 'sent') ? $response['total_items'] : 0;
+        $total_sent = ($filter_status === 'sent') ? $response['total_items'] : 0;
+    } else {
+        // If no filter, get both active and sent
+        $active_response = $mailchimp_api->get_campaigns($offset, $items_per_page, 'save,schedule,paused');
+        $sent_response = $mailchimp_api->get_campaigns($offset, $items_per_page, 'sent');
+        
+        $active_campaigns = is_wp_error($active_response) ? [] : $active_response['campaigns'];
+        $sent_campaigns = is_wp_error($sent_response) ? [] : $sent_response['campaigns'];
+        
+        $total_active = is_wp_error($active_response) ? 0 : $active_response['total_items'];
+        $total_sent = is_wp_error($sent_response) ? 0 : $sent_response['total_items'];
     }
 
-    // Sorting logic
+    $total_active_pages = ceil($total_active / $items_per_page);
+    $total_sent_pages = ceil($total_sent / $items_per_page);
+
+    // Sort function remains the same
     $sort_func = function($a, $b) use ($orderby, $order) {
         if (!$orderby) {
             $valA = isset($a['create_time']) ? strtotime($a['create_time']) : 0;
@@ -84,18 +86,12 @@ function np_render_campaigns_page() {
         return ($order === 'asc') ? $result : -$result;
     };
 
-    usort($draft_scheduled_paused_campaigns, $sort_func);
-    usort($sent_campaigns, $sort_func);
-
-    $total_draft = count($draft_scheduled_paused_campaigns);
-    $total_draft_pages = ceil($total_draft / $items_per_page);
-    $draft_offset = ($current_page - 1) * $items_per_page;
-    $current_draft_campaigns = array_slice($draft_scheduled_paused_campaigns, $draft_offset, $items_per_page);
-
-    $total_sent = count($sent_campaigns);
-    $total_sent_pages = ceil($total_sent / $items_per_page);
-    $sent_offset = ($current_page - 1) * $items_per_page;
-    $current_sent_campaigns = array_slice($sent_campaigns, $sent_offset, $items_per_page);
+    if (!empty($active_campaigns)) {
+        usort($active_campaigns, $sort_func);
+    }
+    if (!empty($sent_campaigns)) {
+        usort($sent_campaigns, $sort_func);
+    }
 
     function get_status_label($status) {
         switch ($status) {
@@ -224,7 +220,7 @@ function np_render_campaigns_page() {
     echo '</form>';
 
     // Draft, Scheduled & Paused Table
-    if (!empty($current_draft_campaigns)) {
+    if (!empty($active_campaigns)) {
         echo '<h2>Draft, Scheduled & Paused Newsletters</h2>';
         echo '<table class="widefat fixed striped" style="width:100%;border-collapse:collapse;">';
         echo '<thead>';
@@ -240,7 +236,7 @@ function np_render_campaigns_page() {
         echo '</thead>';
         echo '<tbody>';
 
-        foreach ($current_draft_campaigns as $c) {
+        foreach ($active_campaigns as $c) {
             $status_label = get_status_label($c['status']);
             $create_time_str = format_wp_time($c['create_time']);
 
@@ -299,11 +295,11 @@ function np_render_campaigns_page() {
 
         echo '</tbody>';
         echo '</table>';
-        render_pagination($total_draft_pages, $current_page, 'draft', $total_draft);
+        render_pagination($total_active_pages, $current_page, 'draft', $total_active);
     }
 
     // Sent Table
-    if (!empty($current_sent_campaigns)) {
+    if (!empty($sent_campaigns)) {
     echo '<h2>Sent Newsletters</h2>';
     echo '<table class="widefat fixed striped" style="width:100%;border-collapse:collapse;table-layout:fixed;">';
     echo '<thead>';
@@ -322,7 +318,7 @@ function np_render_campaigns_page() {
     echo '</thead>';
     echo '<tbody>';
 
-    foreach ($current_sent_campaigns as $c) {
+    foreach ($sent_campaigns as $c) {
         $send_time_str = '-';
         if (!empty($c['send_time'])) {
             $send_time_str = format_wp_time($c['send_time']);
@@ -379,7 +375,7 @@ function np_render_campaigns_page() {
     render_pagination($total_sent_pages, $current_page, 'sent', $total_sent);
 }
 
-    if (empty($draft_scheduled_paused_campaigns) && empty($sent_campaigns)) {
+    if (empty($active_campaigns) && empty($sent_campaigns)) {
         echo '<p>No campaigns found.</p>';
     }
 

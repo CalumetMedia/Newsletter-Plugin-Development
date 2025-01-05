@@ -304,3 +304,91 @@
     background-color: #4a59b3;
     text-decoration: none !important;
 }
+
+.story-item {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    background: #fff;
+    border: 1px solid #ddd;
+    margin: 5px 0;
+    position: relative;
+}
+
+.story-item .story-label {
+    display: flex;
+    align-items: center;
+    flex-grow: 1;
+    margin: 0;
+    cursor: pointer;
+    padding: 5px;
+    min-height: 30px;
+}
+
+.story-item .story-drag-handle {
+    cursor: move;
+    margin-right: 10px;
+    color: #666;
+}
+
+.story-item input[type="checkbox"] {
+    margin-right: 10px;
+    flex-shrink: 0;
+}
+
+.story-item .post-title {
+    display: inline-block;
+    margin-left: 10px;
+    font-size: 14px;
+    color: #333;
+    flex-grow: 1;
+    line-height: 1.4;
+    opacity: 1 !important;
+    visibility: visible !important;
+    pointer-events: auto !important;
+}
+
+.story-item .post-order {
+    width: 50px;
+    margin-left: 10px;
+    text-align: center;
+}
+
+.block-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.sortable-posts {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.sortable-posts.loading {
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.newsletter-status {
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: bold;
+    margin-left: 10px;
+}
+
+.newsletter-status.schedule {
+    background: #e5f5fa;
+    color: #0073aa;
+}
+
+/* Ensure post titles are always visible */
+.story-item .story-label .post-title {
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: inline-block !important;
+    pointer-events: auto !important;
+    user-select: text !important;
+}

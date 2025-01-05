@@ -529,6 +529,45 @@
     function setupBlockEventHandlers(block) {
         let storedContent = {};
         
+        // Add category change handler
+        block.find('.block-category').off('change').on('change', function() {
+            var $block = $(this).closest('.block-item');
+            var categoryId = $(this).val();
+            var blockIndex = $block.data('index');
+            var dateRange = $block.find('.block-date-range').val();
+            var storyCount = $block.find('.block-story-count').val();
+            
+            if (categoryId) {
+                loadBlockPosts($block, categoryId, blockIndex, dateRange, storyCount);
+            }
+        });
+
+        // Add date range change handler
+        block.find('.block-date-range').off('change').on('change', function() {
+            var $block = $(this).closest('.block-item');
+            var categoryId = $block.find('.block-category').val();
+            var blockIndex = $block.data('index');
+            var dateRange = $(this).val();
+            var storyCount = $block.find('.block-story-count').val();
+            
+            if (categoryId) {
+                loadBlockPosts($block, categoryId, blockIndex, dateRange, storyCount);
+            }
+        });
+
+        // Add story count change handler
+        block.find('.block-story-count').off('change').on('change', function() {
+            var $block = $(this).closest('.block-item');
+            var categoryId = $block.find('.block-category').val();
+            var blockIndex = $block.data('index');
+            var dateRange = $block.find('.block-date-range').val();
+            var storyCount = $(this).val();
+            
+            if (categoryId) {
+                loadBlockPosts($block, categoryId, blockIndex, dateRange, storyCount);
+            }
+        });
+
         block.find('.block-type').off('change').on('change', function(e) {
             e.stopPropagation();
             if (isUpdateInProgress()) return;
@@ -1145,13 +1184,27 @@
     };
 
     window.loadBlockPosts = function(block, categoryId, currentIndex, dateRange, storyCount, skipPreview = false) {
+        console.log('loadBlockPosts called with:', {
+            categoryId,
+            currentIndex,
+            dateRange,
+            storyCount,
+            skipPreview
+        });
+
         if (!block || !categoryId) {
+            console.error('Missing required parameters:', { block: !!block, categoryId });
             return Promise.resolve();
         }
 
         var manualOverride = block.find('input[name*="[manual_override]"]').prop('checked') || false;
         var currentSelections = collectPostData(block);
         
+        console.log('Current state:', {
+            manualOverride,
+            currentSelections
+        });
+
         var savedSelections = { 
             [currentIndex]: { 
                 posts: currentSelections,
@@ -1160,39 +1213,46 @@
             } 
         };
 
-        var data = {
-            action: 'load_block_posts',
-            security: newsletterData.nonceLoadPosts,
-            category_id: categoryId,
-            block_index: currentIndex,
-            date_range: dateRange,
-            story_count: storyCount,
-            newsletter_slug: newsletterData.newsletterSlug,
-            saved_selections: JSON.stringify(savedSelections),
-            manual_override: manualOverride ? 'true' : 'false'
-        };
+        var data = new FormData();
+        data.append('action', 'load_block_posts');
+        data.append('security', window.newsletterAjaxNonce || newsletterData.nonceLoadPosts);
+        data.append('category_id', categoryId);
+        data.append('block_index', currentIndex);
+        data.append('date_range', dateRange);
+        data.append('story_count', storyCount);
+        data.append('newsletter_slug', newsletterData.newsletterSlug);
+        data.append('saved_selections', JSON.stringify(savedSelections));
+        data.append('manual_override', manualOverride ? 'true' : 'false');
 
-        return $.ajax({
+        console.log('Sending AJAX request with data:', Object.fromEntries(data));
+
+        return jQuery.ajax({
             url: newsletterData.ajaxUrl,
+            type: 'POST',
             method: 'POST',
-            dataType: 'json',
+            processData: false,
+            contentType: false,
             data: data,
-            beforeSend: function() {
+            beforeSend: function(xhr) {
+                console.log('AJAX request starting...');
+                console.log('Request headers:', xhr.getAllResponseHeaders());
                 block.find('.block-posts').addClass('loading');
             },
             success: function(response) {
+                console.log('AJAX response received:', response);
                 block.find('.block-posts').removeClass('loading');
                 
                 if (response.success && response.data) {
                     var $postsContainer = block.find('.block-posts');
-                    
                     try {
+                        console.log('Processing response data...');
                         $postsContainer.empty();
-                        var $temp = $('<div>').html(response.data);
+                        var $temp = jQuery('<div>').html(response.data);
+                        console.log('Parsed HTML:', $temp.html());
                         
                         if (manualOverride) {
                             $temp.find('input[type="checkbox"]').each(function() {
-                                var $checkbox = $(this);
+                                var $checkbox = jQuery(this);
                                 var postId = $checkbox.closest('li').data('post-id');
                                 if (currentSelections[postId] && currentSelections[postId].checked === '1') {
                                     $checkbox.prop('checked', true);
@@ -1204,6 +1264,15 @@
                         }
                         
                         $postsContainer.append($temp.children());
+                        console.log('Final container HTML:', $postsContainer.html());
+                        
+                        // Force visibility of post titles
+                        $postsContainer.find('.post-title').css({
+                            'display': 'inline-block',
+                            'visibility': 'visible',
+                            'opacity': '1'
+                        });
+                        
                         initializeSortable(block);
                         
                         return saveBlockState(block, manualOverride, function() {
@@ -1216,10 +1285,21 @@
                             }
                         });
                     } catch (error) {
+                        console.error('Error processing response:', error);
                         $postsContainer.html(response.data);
                         return Promise.reject(error);
                     }
+                } else {
+                    console.error('Invalid response:', response);
                 }
+            },
+            error: function(jqXHR, textStatus, errorThrown) {
+                console.error('AJAX request failed:', {
+                    status: textStatus,
+                    error: errorThrown,
+                    response: jqXHR.responseText
+                });
+                block.find('.block-posts').removeClass('loading');
             }
         });
     };

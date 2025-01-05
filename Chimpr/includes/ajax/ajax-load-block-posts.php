@@ -2,16 +2,54 @@
 // includes/ajax/ajax-load-block-posts.php
 if (!defined('ABSPATH')) exit;
 
-function newsletter_load_block_posts() {
-    try {
-        check_ajax_referer('load_block_posts_nonce', 'security');
+error_log('========== AJAX ENDPOINT TRIGGERED ==========');
+error_log('REQUEST METHOD: ' . $_SERVER['REQUEST_METHOD']);
+error_log('POST DATA: ' . print_r($_POST, true));
 
-        $category_id = isset($_POST['category_id']) ? intval($_POST['category_id']) : 0;
-        $block_index = isset($_POST['block_index']) ? intval($_POST['block_index']) : 0;
-        $date_range = isset($_POST['date_range']) ? intval($_POST['date_range']) : 7;
-        $story_count = isset($_POST['story_count']) ? $_POST['story_count'] : 'disable';
+function newsletter_load_block_posts() {
+    error_log('========== FUNCTION CALLED ==========');
+    try {
+        // Verify this is a POST request
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            error_log('Invalid request method: ' . $_SERVER['REQUEST_METHOD']);
+            wp_send_json_error('Invalid request method');
+            return;
+        }
+
+        error_log('Checking nonce...');
+        if (!isset($_POST['security'])) {
+            error_log('Security nonce is missing');
+            wp_send_json_error('Security check failed');
+            return;
+        }
+
+        check_ajax_referer('load_block_posts_nonce', 'security');
+        error_log('Nonce check passed');
+
+        // Validate required parameters
+        $required_params = ['category_id', 'block_index', 'date_range', 'story_count'];
+        foreach ($required_params as $param) {
+            if (!isset($_POST[$param])) {
+                error_log("Missing required parameter: $param");
+                wp_send_json_error("Missing required parameter: $param");
+                return;
+            }
+        }
+
+        $category_id = intval($_POST['category_id']);
+        $block_index = intval($_POST['block_index']);
+        $date_range = intval($_POST['date_range']);
+        $story_count = $_POST['story_count'];
         $manual_override = isset($_POST['manual_override']) && $_POST['manual_override'] === 'true';
         
+        error_log('Request parameters: ' . print_r([
+            'category_id' => $category_id,
+            'block_index' => $block_index,
+            'date_range' => $date_range,
+            'story_count' => $story_count,
+            'manual_override' => $manual_override
+        ], true));
+
         // Validate and decode saved selections with error handling
         $saved_selections = [];
         if (isset($_POST['saved_selections'])) {
@@ -133,13 +171,40 @@ function newsletter_load_block_posts() {
 
         error_log('Newsletter Load - Block ' . $block_index . ' found ' . count($posts) . ' posts');
 
+        // Add initial debug log
+        error_log('=================== NEWSLETTER DEBUG START ===================');
+        error_log('Newsletter Debug: Function load_block_posts called');
+        error_log('Newsletter Debug: Category ID: ' . $category_id);
+        error_log('Newsletter Debug: Block Index: ' . $block_index);
+        error_log('Newsletter Debug: Story Count: ' . $story_count);
+        error_log('Newsletter Debug: Manual Override: ' . ($manual_override ? 'true' : 'false'));
+
+        // After WP_Query
+        error_log('Newsletter Debug: Number of posts found: ' . count($posts));
+        
         if ($posts) {
+            error_log('Newsletter Debug: Starting to process posts');
+            
+            // Before processing ordered posts
+            error_log('Newsletter Debug: Number of posts in posts_map: ' . count($posts_map));
+            error_log('Newsletter Debug: Number of normalized selections: ' . count($normalized_selections));
+            
+            // Before final loop
+            error_log('Newsletter Debug: Number of ordered posts to process: ' . count($ordered_posts));
+            
             $html = '<ul class="sortable-posts"' . (!$manual_override ? ' style="pointer-events: none; opacity: 0.7;"' : '') . '>';
             
             // Create a map of post IDs to posts for easier lookup
             $posts_map = array();
             foreach ($posts as $post) {
-                $posts_map[$post->ID] = $post;
+                $posts_map[$post->ID] = array(
+                    'ID' => $post->ID,
+                    'title' => $post->post_title,
+                    'post_title' => $post->post_title,
+                    'post_date' => $post->post_date,
+                    'post_status' => $post->post_status,
+                    'post_type' => $post->post_type
+                );
             }
             
             // First, add posts that have saved selections in the correct order
@@ -163,17 +228,38 @@ function newsletter_load_block_posts() {
             if (!empty($posts_map)) {
                 $remaining_posts = array_values($posts_map);
                 usort($remaining_posts, function($a, $b) {
-                    return strtotime($b->post_date) - strtotime($a->post_date);
+                    return strtotime($b['post_date']) - strtotime($a['post_date']);
                 });
                 $ordered_posts = array_merge($ordered_posts, $remaining_posts);
             }
             
             // Output posts in final order
             foreach ($ordered_posts as $index => $post) {
-                $post_id = $post->ID;
-                $is_scheduled = $post->post_status === 'future';
+                if (empty($post['ID'])) {
+                    error_log('Newsletter Debug: Invalid post data at index ' . $index);
+                    continue;
+                }
+                
+                error_log(sprintf(
+                    'Newsletter Debug: Processing post - ID: %d, Title: %s, Status: %s, Post Type: %s',
+                    $post['ID'],
+                    $post['title'],
+                    $post['post_status'],
+                    $post['post_type']
+                ));
+
+                $post_id = $post['ID'];
+                $is_scheduled = $post['post_status'] === 'future';
                 $scheduled_label = $is_scheduled ? '<span class="newsletter-status schedule" style="margin-left:10px;">SCHEDULED</span>' : '';
                 
+                // Debug post data
+                error_log(sprintf(
+                    '[Newsletter Debug] Post %d - Title: %s, Status: %s',
+                    $post_id,
+                    $post['title'],
+                    $post['post_status']
+                ));
+
                 $checked = '';
                 if ($manual_override) {
                     // In manual mode, use saved selections
@@ -189,25 +275,41 @@ function newsletter_load_block_posts() {
                 
                 $order_value = isset($normalized_selections[$post_id]['order']) ? $normalized_selections[$post_id]['order'] : $index;
 
-                $html .= sprintf(
+                // Create HTML for debugging
+                $debug_html = sprintf(
                     '<li class="story-item" data-post-id="%d" data-post-date="%s">
                         <span class="dashicons dashicons-sort story-drag-handle"></span>
-                        <input type="checkbox" name="blocks[%d][posts][%d][checked]" value="1" %s>
+                        <label class="story-label">
+                            <input type="checkbox" name="blocks[%d][posts][%d][checked]" value="1" %s>
+                            <span class="post-title">%s%s</span>
+                        </label>
                         <input type="hidden" name="blocks[%d][posts][%d][order]" value="%s" class="post-order">
-                        <label>%s%s</label>
                     </li>',
                     $post_id,
-                    $post->post_date,
+                    $post['post_date'],
                     $block_index,
                     $post_id,
                     $checked,
+                    esc_html($post['title']),
+                    $scheduled_label,
                     $block_index,
                     $post_id,
-                    $order_value,
-                    esc_html($post->post_title),
-                    $scheduled_label
+                    $order_value
                 );
+
+                // Log the generated HTML for inspection
+                error_log('[Newsletter Debug] Generated HTML for post ' . $post_id . ': ' . $debug_html);
+
+                $html .= $debug_html;
+                
+                // After generating HTML for each post
+                error_log('Newsletter Debug: Generated HTML length: ' . strlen($debug_html));
             }
+            
+            // Before sending response
+            error_log('Newsletter Debug: Final HTML length: ' . strlen($html));
+            error_log('=================== NEWSLETTER DEBUG END ===================');
+
             $html .= '</ul>';
             
             if ($story_count !== 'disable') {
@@ -229,7 +331,6 @@ function newsletter_load_block_posts() {
         wp_send_json_error('Error loading block posts: ' . $e->getMessage());
     }
 }
-add_action('wp_ajax_load_block_posts', 'newsletter_load_block_posts');
 
 function newsletter_load_block_content() {
     check_ajax_referer('load_block_posts_nonce', 'security');
@@ -287,4 +388,31 @@ function newsletter_load_block_content() {
 
     wp_send_json_error('Invalid block type');
 }
-add_action('wp_ajax_load_block_content', 'newsletter_load_block_content');
+
+function register_newsletter_ajax_endpoints() {
+    static $registered = false;
+    
+    if ($registered) {
+        return;
+    }
+    
+    error_log('Registering newsletter AJAX endpoints');
+    add_action('wp_ajax_load_block_posts', 'newsletter_load_block_posts');
+    add_action('wp_ajax_nopriv_load_block_posts', 'newsletter_load_block_posts');
+    
+    // Add nonce creation
+    add_action('admin_footer', function() {
+        ?>
+        <script type="text/javascript">
+            if (typeof newsletterAjaxNonce === 'undefined') {
+                var newsletterAjaxNonce = '<?php echo wp_create_nonce("load_block_posts_nonce"); ?>';
+            }
+        </script>
+        <?php
+    });
+    
+    $registered = true;
+}
+
+// Move registration to admin_init to ensure it only runs in admin context
+add_action('admin_init', 'register_newsletter_ajax_endpoints');

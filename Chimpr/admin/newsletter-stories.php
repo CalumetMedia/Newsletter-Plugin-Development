@@ -191,7 +191,6 @@ wp_localize_script('newsletter-admin-js', 'newsletterData', [
     'nonceMailchimp'        => wp_create_nonce('mailchimp_campaign_nonce'),
     'nextScheduledTimestamp'=> $next_scheduled_timestamp ? $next_scheduled_timestamp : ''
 ]);
-
 ?>
 <div class="wrap">
     <h1><?php echo esc_html(sprintf(__('Newsletter Generator for %s', 'newsletter'), $newsletter_name)); ?></h1>
@@ -220,46 +219,88 @@ wp_localize_script('newsletter-admin-js', 'newsletterData', [
                                 <td><input type="text" id="subject_line" name="subject_line" class="regular-text" value="<?php echo esc_attr(get_option("newsletter_subject_line_$newsletter_slug", '')); ?>"></td>
                             </tr>
                             <tr>
-                                <th scope="row"><label for="header_template"><?php esc_html_e('Header Template', 'newsletter'); ?></label></th>
-                                <td>
-                                    <select name="header_template" id="header_template" class="regular-text">
-                                        <option value=""><?php esc_html_e('-- Select Header Template --', 'newsletter'); ?></option>
-                                        <?php
-                                        $all_templates = get_option('newsletter_templates', []);
-                                        foreach ($all_templates as $id => $template) {
-                                            if (isset($template['type']) && $template['type'] === 'header') {
-                                                printf(
-                                                    '<option value="%s" %s>%s</option>',
-                                                    esc_attr($id),
-                                                    selected(get_option("newsletter_header_template_$newsletter_slug", ''), $id, false),
-                                                    esc_html($template['name'])
-                                                );
+                                <th scope="row" style="width: 120px;"><?php esc_html_e('Templates', 'newsletter'); ?></th>
+                                <td style="display: flex; gap: 20px;">
+                                    <div>
+                                        <label for="header_template"><?php esc_html_e('Header:', 'newsletter'); ?></label>
+                                        <select name="header_template" id="header_template" style="width: 200px;">
+                                            <option value=""><?php esc_html_e('-- Select Header --', 'newsletter'); ?></option>
+                                            <?php
+                                            $all_templates = get_option('newsletter_templates', []);
+                                            foreach ($all_templates as $id => $template) {
+                                                if (isset($template['type']) && $template['type'] === 'header') {
+                                                    printf(
+                                                        '<option value="%s" %s>%s</option>',
+                                                        esc_attr($id),
+                                                        selected(get_option("newsletter_header_template_$newsletter_slug", ''), $id, false),
+                                                        esc_html($template['name'])
+                                                    );
+                                                }
                                             }
-                                        }
-                                        ?>
-                                    </select>
+                                            ?>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="footer_template"><?php esc_html_e('Footer:', 'newsletter'); ?></label>
+                                        <select name="footer_template" id="footer_template" style="width: 200px;">
+                                            <option value=""><?php esc_html_e('-- Select Footer --', 'newsletter'); ?></option>
+                                            <?php
+                                            foreach ($all_templates as $id => $template) {
+                                                if (isset($template['type']) && $template['type'] === 'footer') {
+                                                    printf(
+                                                        '<option value="%s" %s>%s</option>',
+                                                        esc_attr($id),
+                                                        selected(get_option("newsletter_footer_template_$newsletter_slug", ''), $id, false),
+                                                        esc_html($template['name'])
+                                                    );
+                                                }
+                                            }
+                                            ?>
+                                        </select>
+                                    </div>
                                 </td>
                             </tr>
+                           
                             <tr>
-                                <th scope="row"><label for="footer_template"><?php esc_html_e('Footer Template', 'newsletter'); ?></label></th>
-                                <td>
-                                    <select name="footer_template" id="footer_template" class="regular-text">
-                                        <option value=""><?php esc_html_e('-- Select Footer Template --', 'newsletter'); ?></option>
-                                        <?php
-                                        foreach ($all_templates as $id => $template) {
-                                            if (isset($template['type']) && $template['type'] === 'footer') {
-                                                printf(
-                                                    '<option value="%s" %s>%s</option>',
-                                                    esc_attr($id),
-                                                    selected(get_option("newsletter_footer_template_$newsletter_slug", ''), $id, false),
-                                                    esc_html($template['name'])
-                                                );
-                                            }
-                                        }
-                                        ?>
-                                    </select>
-                                </td>
-                            </tr>
+    <th scope="row">
+        <?php esc_html_e('Target Tag', 'newsletter'); ?>
+    </th>
+    <td>
+        <?php
+        // Single-select approach
+        $mailchimp = new Newsletter_Mailchimp_API();
+        $list_id   = get_option('mailchimp_list_id');
+
+        // Pull the saved single tag
+        $selected_tag = get_option("newsletter_target_tag_$newsletter_slug", '');
+
+        // Fetch Mailchimp tags
+        $tags_response = $mailchimp->get_list_tags($list_id);
+
+        if (!is_wp_error($tags_response) && isset($tags_response['tags'])) {
+            echo '<select name="target_tag" id="target_tag" style="width: 100%; max-width: 420px;">';
+            echo '<option value="">-- Select a Tag --</option>';
+            
+            foreach ($tags_response['tags'] as $tag) {
+                $value   = isset($tag['id']) ? $tag['id'] : '';
+                $label   = isset($tag['name']) ? $tag['name'] : '(No Name)';
+                $isSelected = selected($selected_tag, $value, false);
+
+                printf(
+                    '<option value="%s" %s>%s</option>',
+                    esc_attr($value),
+                    $isSelected,
+                    esc_html($label)
+                );
+            }
+
+            echo '</select>';
+        } else {
+            echo '<p class="description error">' . esc_html__('Unable to fetch Mailchimp tags. Please check your API connection.', 'newsletter') . '</p>';
+        }
+        ?>
+    </td>
+</tr>
                             <?php
                             if (!empty($next_scheduled_text)) {
                                 echo $next_scheduled_text;
@@ -274,6 +315,7 @@ wp_localize_script('newsletter-admin-js', 'newsletterData', [
                                 <strong><?php esc_html_e('SAVE', 'newsletter'); ?></strong>
                             </button>
 
+                            <!-- We keep this reset button with type="button" -->
                             <button type="button" class="button button-large action-button reset-button" id="reset-blocks">
                                 <span class="dashicons dashicons-image-rotate button-icon"></span>
                                 <strong><?php esc_html_e('RESET', 'newsletter'); ?></strong>
@@ -309,16 +351,16 @@ wp_localize_script('newsletter-admin-js', 'newsletterData', [
                                     <strong><?php esc_html_e('SEND DRAFT', 'newsletter'); ?></strong>
                                 </button>
 
-<?php if ($next_scheduled_timestamp): ?>
-    <button type="button" 
-            class="button button-large action-button schedule-button" 
-            id="schedule-campaign" 
-            data-timestamp="<?php echo esc_attr((int)$next_scheduled_timestamp); ?>"
-            data-formatted-time="<?php echo esc_attr(wp_date('F j, Y g:i a', $next_scheduled_timestamp)); ?>">
-        <span class="dashicons dashicons-calendar button-icon"></span>
-        <strong><?php esc_html_e('SCHEDULE', 'newsletter'); ?></strong>
-    </button>
-<?php endif; ?> 
+                                <?php if ($next_scheduled_timestamp): ?>
+                                    <button type="button" 
+                                            class="button button-large action-button schedule-button" 
+                                            id="schedule-campaign" 
+                                            data-timestamp="<?php echo esc_attr((int)$next_scheduled_timestamp); ?>"
+                                            data-formatted-time="<?php echo esc_attr(wp_date('F j, Y g:i a', $next_scheduled_timestamp)); ?>">
+                                        <span class="dashicons dashicons-calendar button-icon"></span>
+                                        <strong><?php esc_html_e('SCHEDULE', 'newsletter'); ?></strong>
+                                    </button>
+                                <?php endif; ?>
 
                                 <button type="button" class="button button-large action-button" id="send-now">
                                     <span class="dashicons dashicons-megaphone button-icon"></span>
@@ -475,26 +517,11 @@ jQuery(document).ready(function($) {
 });
 </script>
 
-<!-- Reset Button Script -->
+<!-- We removed the inline reset button script to avoid double submission -->
 <script>
 jQuery(document).ready(function($) {
-    $('#reset-blocks').on('click', function(e) {
-        e.preventDefault();
-        console.log('Reset button clicked');
-        const confirmed = confirm("Do you want to reset the newsletter to it's default state?");
-        if (confirmed) {
-            console.log('Reset confirmed');
-            const resetInput = $('<input>').attr({
-                type: 'hidden',
-                name: 'reset_blocks',
-                value: '1'
-            });
-            console.log('Adding reset input to form');
-            $('#blocks-form').append(resetInput);
-            console.log('Form data before submit:', $('#blocks-form').serializeArray());
-            $('#blocks-form').submit();
-        }
-    });
+    // If you want to do any other inline JS, add it here.
+    // The #reset-blocks logic is now handled solely by your events.js / AJAX approach.
 });
 </script>
 
@@ -514,3 +541,16 @@ jQuery(document).ready(function($) {
     $('.nav-tab.nav-tab-active').trigger('click');
 });
 </script>
+
+<!-- Reset Target Tags Script -->
+<script>
+jQuery(document).ready(function($) {
+    $('#reset_target_tags').on('click', function() {
+        if (confirm('<?php esc_html_e('Are you sure you want to clear all selected target tags?', 'newsletter'); ?>')) {
+            $('#target_tags option:selected').prop('selected', false);
+        }
+    });
+});
+</script>
+
+</div>

@@ -51,41 +51,73 @@
     });
 
     // Reset blocks event
-    $(document).off('click', '#reset-blocks').on('click', '#reset-blocks', function() {
-        $('.block-item').each(function() {
-            var block = $(this);
-            var blockType = block.find('.block-type').val();
+$(document).off('click', '#reset-blocks').on('click', '#reset-blocks', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
 
-            // Handle WYSIWYG Editor Block
-            if (blockType === 'wysiwyg') {
-                // Uncheck Show Title if checked
-                var showTitleCheckbox = block.find('.show-title-toggle');
-                if (showTitleCheckbox.prop('checked')) {
-                    showTitleCheckbox.prop('checked', false);
-                }
+    var $form = $('#blocks-form');
+    var $submitButton = $(this);
 
-                // Clear editor content
-                var editorId = block.find('.wysiwyg-editor-content').attr('id');
-                if (editorId && tinymce.get(editorId)) {
-                    tinymce.get(editorId).setContent('');
-                    tinymce.get(editorId).save();
-                }
+    // Disable to prevent double-click
+    $submitButton.prop('disabled', true);
+
+    $form.find('.block-item').each(function() {
+        var $block = $(this);
+        var blockIndex = $block.data('index');
+        var blockType = $block.find('.block-type').val();
+
+        // 1) WYSIWYG Blocks: Clear Editor, Title, Show Title
+        if (blockType === 'wysiwyg') {
+            // Editor ID
+            var editorId = 'wysiwyg-editor-' + blockIndex;
+
+            // Clear TinyMCE content
+            if (tinymce.get(editorId)) {
+                tinymce.get(editorId).setContent('');
+                tinymce.get(editorId).save();
             }
-            // Handle Content Block
-            else if (blockType === 'content') {
-                // Uncheck manual override if checked
-                var manualOverride = block.find('input[name*="[manual_override]"]');
-                if (manualOverride.prop('checked')) {
-                    manualOverride.prop('checked', false);
-                    handleManualOverrideToggle(block, false);
-                }
-            }
-            // HTML and PDF blocks - do nothing
-        });
 
-        // Update preview after all changes
-        updatePreview('reset_blocks');
+            // Clear raw <textarea>
+            $block.find('textarea[name="blocks[' + blockIndex + '][wysiwyg]"]').val('');
+
+            // Clear the block title
+            $block.find('input[name="blocks[' + blockIndex + '][title]"]').val('');
+
+            // Uncheck "Show Title in Preview"
+            $block.find('input[name="blocks[' + blockIndex + '][show_title]"]')
+                .prop('checked', false)
+                .trigger('change');
+        }
+
+        // 2) Content (Story) Blocks: Turn off Manual Override
+        if (blockType === 'content') {
+            $block.find('input[name="blocks[' + blockIndex + '][manual_override]"]')
+                .prop('checked', false)
+                .trigger('change');
+        }
     });
+
+    // Build form data AFTER clearing
+    var formData = new FormData($form[0]);
+    formData.append('reset_blocks', '1');
+
+    // Send via AJAX
+    $.ajax({
+        url: $form.attr('action'),
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function() {
+            alert('WYSIWYG content cleared, WYSIWYG show-title off, content manual override off. Refresh to confirm.');
+        },
+        complete: function() {
+            $submitButton.prop('disabled', false);
+        }
+    });
+});
+
+
 
     // Story count change
     $(document).off('change.newsletter', '.block-story-count').on('change.newsletter', '.block-story-count', function() {

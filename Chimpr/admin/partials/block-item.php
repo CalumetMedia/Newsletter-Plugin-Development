@@ -12,6 +12,10 @@ $block_date_range = isset($block['date_range']) ? $block['date_range'] : '7';
 $block_story_count = isset($block['story_count']) ? $block['story_count'] : 'disable';
 $block_manual_override = isset($block['manual_override']) ? $block['manual_override'] : false;
 $block_show_title = isset($block['show_title']) ? $block['show_title'] : false;
+
+// Debug logging
+error_log("Block Data - Index: $index");
+error_log("Block Content: " . print_r($block, true));
 ?>
 
 <div class="block-item" data-index="<?php echo esc_attr($index); ?>" data-block-index="<?php echo esc_attr($index); ?>">
@@ -57,23 +61,26 @@ $block_show_title = isset($block['show_title']) ? $block['show_title'] : false;
                 </select>
             </div>
 
-            <div class="block-field category-select">
-                <label><?php esc_html_e('Select Category:', 'newsletter'); ?></label>
-                <select name="blocks[<?php echo esc_attr($index); ?>][category]" class="block-category"
-                        <?php echo ($block_type !== 'content') ? 'disabled' : ''; ?>>
-                    <option value=""><?php esc_html_e('-- Select Category --', 'newsletter'); ?></option>
-                    <?php
-                    foreach ($all_categories as $category) {
-                        printf(
-                            '<option value="%s" %s>%s</option>',
-                            esc_attr($category->term_id),
-                            selected($block_category, $category->term_id, false),
-                            esc_html($category->name)
-                        );
-                    }
-                    ?>
-                </select>
-            </div>
+<div class="block-field category-select">
+    <label><?php esc_html_e('Select Category:', 'newsletter'); ?></label>
+    <select name="blocks[<?php echo esc_attr($index); ?>][category]" 
+            class="block-category"
+            data-block-index="<?php echo esc_attr($index); ?>"
+            <?php echo ($block_type !== 'content') ? 'disabled' : ''; ?>>
+        <option value=""><?php esc_html_e('-- Select Category --', 'newsletter'); ?></option>
+        <?php
+        foreach ($all_categories as $category) {
+            error_log('Category select: ID=' . $category->term_id . ', Selected=' . $block_category);
+            printf(
+                '<option value="%d" %s>%s</option>',
+                $category->term_id,
+                selected($block_category, $category->term_id, false),
+                esc_html($category->name)
+            );
+        }
+        ?>
+    </select>
+</div>
 
             <div class="block-field template-select">
                 <label><?php esc_html_e('Template:', 'newsletter'); ?></label>
@@ -164,29 +171,35 @@ $block_show_title = isset($block['show_title']) ? $block['show_title'] : false;
                 <?php endif; ?>
                 <?php if (!empty($block['posts'])): ?>
                     <ul class="sortable-posts">
-                        <?php foreach ($block['posts'] as $post_id => $post): ?>
+                        <?php 
+                        foreach ($block['posts'] as $post_id => $post_data): 
+                            // Fetch the actual post object
+                            $post_object = get_post($post_id);
+                            error_log("Post Object for ID $post_id: " . print_r($post_object, true));
+                            
+                            if ($post_object):
+                                $post_title = $post_object->post_title;
+                                $is_checked = isset($post_data['checked']) && $post_data['checked'] === '1';
+                                $order_value = $post_data['order'] ?? '';
+                        ?>
                             <li class="story-item" data-post-id="<?php echo esc_attr($post_id); ?>">
                                 <span class="dashicons dashicons-sort story-drag-handle"></span>
                                 <label>
-                                    <input type="checkbox" name="blocks[<?php echo esc_attr($index); ?>][posts][<?php echo esc_attr($post_id); ?>][checked]" 
-                                           value="1" <?php checked(isset($post['checked']), true); ?>>
-                                    <?php if (!empty($post['thumbnail'])): ?>
-                                        <img class="post-thumbnail" src="<?php echo esc_url($post['thumbnail']); ?>" 
-                                             alt="<?php echo esc_attr(isset($post['title']) ? $post['title'] : (isset($post['post_title']) ? $post['post_title'] : '')); ?>">
-                                    <?php endif; ?>
-                                    <span class="post-title"><?php 
-                                        if (is_object($post)) {
-                                            echo esc_html($post->post_title);
-                                        } else {
-                                            echo esc_html(isset($post['title']) ? $post['title'] : (isset($post['post_title']) ? $post['post_title'] : ''));
-                                        }
-                                    ?></span>
+                                    <input type="checkbox" 
+                                           name="blocks[<?php echo esc_attr($index); ?>][posts][<?php echo esc_attr($post_id); ?>][checked]" 
+                                           value="1" 
+                                           <?php checked($is_checked, true); ?>>
+                                    <span class="post-title"><?php echo esc_html($post_title); ?></span>
                                 </label>
-                                <input type="hidden" class="post-order" 
+                                <input type="hidden" 
+                                       class="post-order" 
                                        name="blocks[<?php echo esc_attr($index); ?>][posts][<?php echo esc_attr($post_id); ?>][order]" 
-                                       value="<?php echo esc_attr($post['order'] ?? ''); ?>">
+                                       value="<?php echo esc_attr($order_value); ?>">
                             </li>
-                        <?php endforeach; ?>
+                        <?php 
+                            endif;
+                        endforeach; 
+                        ?>
                     </ul>
                 <?php endif; ?>
             </div>

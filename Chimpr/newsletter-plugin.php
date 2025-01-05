@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name:       Chimpr
- * Description:       Debug log reset. 
- * Version:           2.3.2.6
+ * Description:       Pre-deployment small bug fixes
+ * Version:           2.3.2.7
  * Author:            Jon Stewart
  * Text Domain:       chimpr-newsletter
  */
@@ -16,7 +16,7 @@ if (!defined('ABSPATH')) {
  */
 define('NEWSLETTER_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('NEWSLETTER_PLUGIN_URL', plugin_dir_url(__FILE__));
-define('NEWSLETTER_PLUGIN_VERSION', '2.3.2.6');
+define('NEWSLETTER_PLUGIN_VERSION', '2.3.2.7');
 
 /**
  * Load text domain and initialize

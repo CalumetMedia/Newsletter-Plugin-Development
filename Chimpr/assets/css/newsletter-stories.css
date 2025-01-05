@@ -306,13 +306,13 @@
 }
 
 .story-item {
+    padding: 8px;
+    background: #fff;
+    border-radius: 3px;
+    margin-bottom: 4px;
     display: flex;
     align-items: center;
-    padding: 10px;
-    background: #fff;
-    border: 1px solid #ddd;
-    margin: 5px 0;
-    position: relative;
+    gap: 8px;
 }
 
 .story-item .story-label {
@@ -362,8 +362,8 @@
 
 .sortable-posts {
     list-style: none;
-    padding: 0;
     margin: 0;
+    padding: 0;
 }
 
 .sortable-posts.loading {
@@ -391,4 +391,46 @@
     display: inline-block !important;
     pointer-events: auto !important;
     user-select: text !important;
+}
+
+
+/* Enhanced drag and drop styles */
+.ui-sortable-helper {
+    background: #f8f9fa !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    border: 1px solid #e2e4e7;
+}
+
+.ui-sortable-placeholder {
+    visibility: visible !important;
+    background: #f0f0f0;
+    border: 2px dashed #ccc;
+    margin-bottom: 4px;
+}
+
+.story-drag-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 3px;
+}
+
+.story-item.ui-sortable-helper .story-drag-handle {
+    color: #2271b1;
+}
+
+/* Ensure proper cursor states */
+.manual-override-enabled .story-drag-handle {
+    cursor: grab;
+}
+
+.manual-override-enabled .ui-sortable-helper .story-drag-handle {
+    cursor: grabbing;
+}
+
+/* Prevent text selection while dragging */
+.ui-sortable-helper * {
+    user-select: none !important;
 }

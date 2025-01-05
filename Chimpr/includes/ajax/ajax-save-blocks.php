@@ -26,6 +26,37 @@ function newsletter_handle_blocks_form_submission() {
     try {
         check_ajax_referer('save_blocks_action', 'security');
 
+        // Get newsletter slug
+        $newsletter_slug = isset($_POST['newsletter_slug']) ? sanitize_text_field($_POST['newsletter_slug']) : '';
+        if (empty($newsletter_slug)) {
+            wp_send_json_error(['message' => 'Missing newsletter slug']);
+            return;
+        }
+
+        // Save target tag if present
+        if (isset($_POST['target_tag']) && !empty($_POST['target_tag'])) {
+            $target_tag = sanitize_text_field($_POST['target_tag']);
+            update_option("newsletter_target_tag_$newsletter_slug", $target_tag);
+        }
+
+        // Save subject line if present
+        if (isset($_POST['subject_line'])) {
+            $subject_line = sanitize_text_field($_POST['subject_line']);
+            update_option("newsletter_subject_line_$newsletter_slug", $subject_line);
+        }
+
+        // Save header template if present
+        if (isset($_POST['header_template'])) {
+            $header_template = sanitize_text_field($_POST['header_template']);
+            update_option("newsletter_header_template_$newsletter_slug", $header_template);
+        }
+
+        // Save footer template if present
+        if (isset($_POST['footer_template'])) {
+            $footer_template = sanitize_text_field($_POST['footer_template']);
+            update_option("newsletter_footer_template_$newsletter_slug", $footer_template);
+        }
+
         // Set reasonable limits for large operations
         set_time_limit(120);
         $current_limit = ini_get('memory_limit');
@@ -33,7 +64,6 @@ function newsletter_handle_blocks_form_submission() {
             ini_set('memory_limit', '256M');
         }
 
-        $newsletter_slug = isset($_POST['newsletter_slug']) ? sanitize_text_field($_POST['newsletter_slug']) : 'default';
         $is_auto_save = isset($_POST['is_auto_save']) && $_POST['is_auto_save'];
 
         // Get existing blocks
@@ -181,28 +211,6 @@ function newsletter_handle_blocks_form_submission() {
         if (!$save_verified) {
             wp_send_json_error('Save verification failed');
             return;
-        }
-
-        // Handle additional fields for non-auto-save
-        if (!$is_auto_save) {
-            if (isset($_POST['subject_line'])) {
-                update_option(
-                    "newsletter_subject_line_$newsletter_slug", 
-                    sanitize_text_field(wp_unslash($_POST['subject_line']))
-                );
-            }
-            if (isset($_POST['header_template'])) {
-                update_option(
-                    "newsletter_header_template_$newsletter_slug", 
-                    sanitize_text_field(wp_unslash($_POST['header_template']))
-                );
-            }
-            if (isset($_POST['footer_template'])) {
-                update_option(
-                    "newsletter_footer_template_$newsletter_slug", 
-                    sanitize_text_field(wp_unslash($_POST['footer_template']))
-                );
-            }
         }
 
         wp_send_json_success([

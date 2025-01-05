@@ -162,13 +162,18 @@
     window.initializeBlock = function(block) {
         try {
             var blockIndex = block.data('index');
-            
-            // Get block type first
             var blockType = block.find('.block-type').val();
             
-            // Handle initial state for PDF Link type before any other initialization
+            // Handle HTML block type first
+            if (blockType === 'html') {
+                block.find('.story-count-row select, .block-story-count')
+                    .prop('disabled', true)
+                    .closest('div')
+                    .css('opacity', '0.7');
+            }
+            
+            // Handle PDF Link type
             if (blockType === 'pdf_link') {
-                // First disable all fields and set opacity
                 block.find('.category-select select, .date-range-row select, .story-count-row select, .manual-override-toggle, .block-story-count')
                     .each(function() {
                         $(this).prop('disabled', true);
@@ -179,7 +184,6 @@
                 block.find('.category-select select, .date-range-row select, .story-count-row select, .block-story-count')
                     .css('opacity', '0.7');
                 
-                // Enable template only
                 block.find('.template-select select')
                     .prop('disabled', false)
                     .css('opacity', '1');
@@ -196,8 +200,8 @@
             // Set initial state of story count dropdown based on manual override
             var isManual = block.find('input[name*="[manual_override]"]').prop('checked');
             var $storyCount = block.find('.block-story-count');
-            $storyCount.prop('disabled', isManual);
-            $storyCount.css('opacity', isManual ? '0.7' : '1');
+            $storyCount.prop('disabled', isManual || blockType === 'html');
+            $storyCount.css('opacity', (isManual || blockType === 'html') ? '0.7' : '1');
             
             // Initial block type setup
             handleBlockTypeChange(block, blockType);
@@ -222,7 +226,7 @@
                         loadBlockPosts(block, initialCategory, blockIndex, dateRange, storyCount)
                             .then(() => {
                                 // After loading posts, handle story count if needed
-                                if (!isManual && storyCount !== 'disable') {
+                                if (!isManual && storyCount !== 'disable' && blockType !== 'html') {
                                     handleStoryCountChange(block, storyCount);
                                 }
                                 resolve();
@@ -233,7 +237,7 @@
                             });
                     });
                 });
-            } else if (!isManual && $storyCount.val() !== 'disable') {
+            } else if (!isManual && $storyCount.val() !== 'disable' && blockType !== 'html') {
                 handleStoryCountChange(block, $storyCount.val());
             }
 
@@ -248,23 +252,14 @@
     };
 
     // Handle block type changes (show/hide fields)
-    window.handleBlockTypeChange = function(block, blockType) {
-        const blockIndex = block.data('index');
-        console.log('Block type change initiated:', {
-            blockIndex: blockIndex,
-            oldType: block.find('.block-type').data('previous-type'),
-            newType: blockType,
-            hasHtmlContent: block.find('.block-html').val() ? true : false,
-            htmlContent: block.find('.block-html').val(),
-            hasWysiwygContent: block.find('.wysiwyg-editor-content').val() ? true : false
-        });
-
+    function handleBlockTypeChange(block, blockType) {
         if (block.data('type-change-in-progress')) {
             return;
         }
         block.data('type-change-in-progress', true);
         
         // Store existing content before cleanup
+        const blockIndex = block.data('index');
         const editorId = 'wysiwyg-editor-' + blockIndex;
         let existingContent = '';
         let oldType = block.find('.block-type').data('previous-type');
@@ -302,54 +297,41 @@
         if (typeof window.updatePreview === 'function') {
             window.updatePreview('block_type_change');
         }
-
-        // Log visibility states after change
-        console.log('Block visibility after change:', {
-            contentBlock: block.find('.content-block').is(':visible'),
-            htmlBlock: block.find('.html-block').is(':visible'),
-            wysiwygBlock: block.find('.wysiwyg-block').is(':visible')
-        });
-    };
+    }
 
     // Helper function to set up fields based on block type
     function setupBlockFields(block, blockType) {
         const isContentType = blockType === 'content';
         const isPdfLinkType = blockType === 'pdf_link';
         
-        block.find('.category-select select, .date-range-row select, .story-count-row select, .manual-override-toggle')
+        // Disable category, date range, and manual override for non-content types
+        block.find('.category-select select, .date-range-row select, .manual-override-toggle')
             .prop('disabled', !(isContentType || isPdfLinkType))
             .closest('div')
             .css('opacity', (isContentType || isPdfLinkType) ? '1' : '0.7');
+            
+        // Always disable story count for HTML blocks
+        const $storyCount = block.find('.story-count-row select, .block-story-count');
+        if (blockType === 'html') {
+            $storyCount.prop('disabled', true)
+                .closest('div')
+                .css('opacity', '0.7');
+        } else {
+            $storyCount.prop('disabled', !(isContentType || isPdfLinkType))
+                .closest('div')
+                .css('opacity', (isContentType || isPdfLinkType) ? '1' : '0.7');
+        }
     }
 
     // Helper function to set up HTML block
     function setupHtmlBlock(block, existingContent) {
-        const blockIndex = block.data('index');
-        console.log('Setting up HTML block:', {
-            blockIndex: blockIndex,
-            hasExistingContent: !!existingContent,
-            existingContent: existingContent,
-            currentHtmlContent: block.find('.html-block textarea').val(),
-            htmlBlockVisible: block.find('.html-block').is(':visible')
-        });
-        
         const $container = block.find('.html-block');
         $container.show();
         
         // Initialize textarea with content
         const $textarea = $container.find('textarea');
         if ($textarea.length) {
-            console.log('Before setting HTML textarea value:', {
-                blockIndex: blockIndex,
-                oldValue: $textarea.val(),
-                newValue: existingContent
-            });
             $textarea.val(existingContent);
-            console.log('After setting HTML textarea value:', {
-                blockIndex: blockIndex,
-                currentValue: $textarea.val(),
-                textareaExists: $textarea.length > 0
-            });
         }
     }
 
@@ -529,45 +511,6 @@
     function setupBlockEventHandlers(block) {
         let storedContent = {};
         
-        // Add category change handler
-        block.find('.block-category').off('change').on('change', function() {
-            var $block = $(this).closest('.block-item');
-            var categoryId = $(this).val();
-            var blockIndex = $block.data('index');
-            var dateRange = $block.find('.block-date-range').val();
-            var storyCount = $block.find('.block-story-count').val();
-            
-            if (categoryId) {
-                loadBlockPosts($block, categoryId, blockIndex, dateRange, storyCount);
-            }
-        });
-
-        // Add date range change handler
-        block.find('.block-date-range').off('change').on('change', function() {
-            var $block = $(this).closest('.block-item');
-            var categoryId = $block.find('.block-category').val();
-            var blockIndex = $block.data('index');
-            var dateRange = $(this).val();
-            var storyCount = $block.find('.block-story-count').val();
-            
-            if (categoryId) {
-                loadBlockPosts($block, categoryId, blockIndex, dateRange, storyCount);
-            }
-        });
-
-        // Add story count change handler
-        block.find('.block-story-count').off('change').on('change', function() {
-            var $block = $(this).closest('.block-item');
-            var categoryId = $block.find('.block-category').val();
-            var blockIndex = $block.data('index');
-            var dateRange = $block.find('.block-date-range').val();
-            var storyCount = $(this).val();
-            
-            if (categoryId) {
-                loadBlockPosts($block, categoryId, blockIndex, dateRange, storyCount);
-            }
-        });
-
         block.find('.block-type').off('change').on('change', function(e) {
             e.stopPropagation();
             if (isUpdateInProgress()) return;
@@ -782,6 +725,10 @@
         const $postsList = $block.find('.sortable-posts');
         const $storyCount = $block.find('.block-story-count');
         
+        if (!isManual && $storyCount.val() !== 'disable') {
+            handleStoryCountChange($block, $storyCount.val());
+        }
+        
         $postsList.css({
             'pointer-events': isManual ? 'auto' : 'none',
             'opacity': isManual ? '1' : '0.7'
@@ -789,10 +736,6 @@
         
         $storyCount.prop('disabled', isManual);
         $postsList.find('input[type="checkbox"]').prop('disabled', !isManual);
-
-        if (!isManual && $storyCount.val() !== 'disable') {
-            handleStoryCountChange($block, $storyCount.val());
-        }
 
         const sortableList = $block.find('ul.sortable-posts');
         if (sortableList.length && sortableList.hasClass('ui-sortable')) {
@@ -999,6 +942,10 @@
             const $postsList = $block.find('.sortable-posts');
             const $storyCount = $block.find('.block-story-count');
             
+            if (!isManual && $storyCount.val() !== 'disable') {
+                handleStoryCountChange($block, $storyCount.val());
+            }
+            
             $postsList.css({
                 'pointer-events': isManual ? 'auto' : 'none',
                 'opacity': isManual ? '1' : '0.7'
@@ -1006,10 +953,6 @@
             
             $storyCount.prop('disabled', isManual);
             $postsList.find('input[type="checkbox"]').prop('disabled', !isManual);
-
-            if (!isManual && $storyCount.val() !== 'disable') {
-                handleStoryCountChange($block, $storyCount.val());
-            }
         }
 
         function handleStoryCountChange($block, storyCountVal) {
@@ -1066,7 +1009,6 @@
     };
 
     function initializeBlocks() {
-        console.log('Starting initializeBlocks');
         window.newsletterState = {
             blocksLoaded: 0,
             totalBlocks: $('.block-item').length,
@@ -1078,18 +1020,87 @@
         };
 
         var blocks = $('.block-item');
-        console.log('Total blocks to initialize:', blocks.length);
+        var totalBlocks = blocks.length;
+        var loadedBlocks = 0;
         
+        if (totalBlocks === 0) {
+            window.newsletterState.isReady = true;
+            return;
+        }
+        
+        // First pass: handle PDF Link blocks
         blocks.each(function() {
             var block = $(this);
             var blockType = block.find('.block-type').val();
-            var blockIndex = block.data('index');
-            console.log('Initializing block:', {
-                index: blockIndex,
-                type: blockType,
-                htmlContent: blockType === 'html' ? block.find('.block-html').val() : null,
-                wysiwygContent: blockType === 'wysiwyg' ? block.find('.wysiwyg-editor-content').val() : null
-            });
+            
+            if (blockType === 'pdf_link') {
+                block.find('.category-select select, .date-range-row select, .story-count-row select, .manual-override-toggle, .block-story-count')
+                    .prop('disabled', true)
+                    .css('opacity', '0.7');
+                
+                block.find('.category-select, .date-range-row, .story-count-row')
+                    .css('opacity', '0.7');
+                
+                block.find('.template-select select')
+                    .prop('disabled', false)
+                    .css('opacity', '1');
+                block.find('.template-select')
+                    .css('opacity', '1');
+                
+                loadedBlocks++;
+                window.newsletterState.blocksLoaded = loadedBlocks;
+            }
+        });
+        
+        // Second pass: initialize remaining blocks
+        blocks.each(function(index) {
+            var block = $(this);
+            var blockType = block.find('.block-type').val();
+            
+            if (blockType === 'pdf_link') {
+                return;
+            }
+            
+            block.attr('data-block-index', index);
+            setupBlockEventHandlers(block);
+            
+            var categorySelect = block.find('.block-category');
+            var categoryId = categorySelect.val();
+            var currentIndex = index;
+            var dateRange = block.find('.block-date-range').val() || '7';
+            var storyCount = block.find('.block-story-count').val() || 'disable';
+            var manualOverride = block.find('input[name*="[manual_override]"]').prop('checked') || false;
+            
+            if (!categoryId) {
+                loadedBlocks++;
+                window.newsletterState.blocksLoaded = loadedBlocks;
+                
+                if (loadedBlocks === totalBlocks) {
+                    window.newsletterState.isReady = true;
+                    updatePreview('initialization_complete');
+                }
+                return;
+            }
+            
+            loadBlockPosts(block, categoryId, currentIndex, dateRange, storyCount, true)
+                .then(function() {
+                    loadedBlocks++;
+                    window.newsletterState.blocksLoaded = loadedBlocks;
+                    
+                    if (loadedBlocks === totalBlocks) {
+                        window.newsletterState.isReady = true;
+                        updatePreview('initialization_complete');
+                    }
+                })
+                .catch(function(error) {
+                    loadedBlocks++;
+                    window.newsletterState.blocksLoaded = loadedBlocks;
+                    
+                    if (loadedBlocks === totalBlocks) {
+                        window.newsletterState.isReady = true;
+                        updatePreview('initialization_complete');
+                    }
+                });
         });
     }
 
@@ -1119,14 +1130,6 @@
     };
 
     window.saveBlockState = function($block, isManual, callback) {
-        console.log('Saving block state:', {
-            blockIndex: $block.data('index'),
-            blockType: $block.find('.block-type').val(),
-            isManual: isManual,
-            htmlContent: $block.find('.block-html').val(),
-            wysiwygContent: $block.find('.wysiwyg-editor-content').val() ? true : false
-        });
-        
         var blocks = [];
         
         $('#blocks-container .block-item').each(function(index) {
@@ -1184,27 +1187,13 @@
     };
 
     window.loadBlockPosts = function(block, categoryId, currentIndex, dateRange, storyCount, skipPreview = false) {
-        console.log('loadBlockPosts called with:', {
-            categoryId,
-            currentIndex,
-            dateRange,
-            storyCount,
-            skipPreview
-        });
-
         if (!block || !categoryId) {
-            console.error('Missing required parameters:', { block: !!block, categoryId });
             return Promise.resolve();
         }
 
         var manualOverride = block.find('input[name*="[manual_override]"]').prop('checked') || false;
         var currentSelections = collectPostData(block);
         
-        console.log('Current state:', {
-            manualOverride,
-            currentSelections
-        });
-
         var savedSelections = { 
             [currentIndex]: { 
                 posts: currentSelections,
@@ -1213,46 +1202,39 @@
             } 
         };
 
-        var data = new FormData();
-        data.append('action', 'load_block_posts');
-        data.append('security', window.newsletterAjaxNonce || newsletterData.nonceLoadPosts);
-        data.append('category_id', categoryId);
-        data.append('block_index', currentIndex);
-        data.append('date_range', dateRange);
-        data.append('story_count', storyCount);
-        data.append('newsletter_slug', newsletterData.newsletterSlug);
-        data.append('saved_selections', JSON.stringify(savedSelections));
-        data.append('manual_override', manualOverride ? 'true' : 'false');
+        var data = {
+            action: 'load_block_posts',
+            security: newsletterData.nonceLoadPosts,
+            category_id: categoryId,
+            block_index: currentIndex,
+            date_range: dateRange,
+            story_count: storyCount,
+            newsletter_slug: newsletterData.newsletterSlug,
+            saved_selections: JSON.stringify(savedSelections),
+            manual_override: manualOverride ? 'true' : 'false'
+        };
 
-        console.log('Sending AJAX request with data:', Object.fromEntries(data));
-
-        return jQuery.ajax({
+        return $.ajax({
             url: newsletterData.ajaxUrl,
-            type: 'POST',
             method: 'POST',
-            processData: false,
-            contentType: false,
+            dataType: 'json',
             data: data,
-            beforeSend: function(xhr) {
-                console.log('AJAX request starting...');
-                console.log('Request headers:', xhr.getAllResponseHeaders());
+            beforeSend: function() {
                 block.find('.block-posts').addClass('loading');
             },
             success: function(response) {
-                console.log('AJAX response received:', response);
                 block.find('.block-posts').removeClass('loading');
                 
                 if (response.success && response.data) {
                     var $postsContainer = block.find('.block-posts');
+                    
                     try {
-                        console.log('Processing response data...');
                         $postsContainer.empty();
-                        var $temp = jQuery('<div>').html(response.data);
-                        console.log('Parsed HTML:', $temp.html());
+                        var $temp = $('<div>').html(response.data);
                         
                         if (manualOverride) {
                             $temp.find('input[type="checkbox"]').each(function() {
-                                var $checkbox = jQuery(this);
+                                var $checkbox = $(this);
                                 var postId = $checkbox.closest('li').data('post-id');
                                 if (currentSelections[postId] && currentSelections[postId].checked === '1') {
                                     $checkbox.prop('checked', true);
@@ -1264,18 +1246,12 @@
                         }
                         
                         $postsContainer.append($temp.children());
-                        console.log('Final container HTML:', $postsContainer.html());
-                        
-                        // Force visibility of post titles
-                        $postsContainer.find('.post-title').css({
-                            'display': 'inline-block',
-                            'visibility': 'visible',
-                            'opacity': '1'
-                        });
-                        
                         initializeSortable(block);
                         
                         return saveBlockState(block, manualOverride, function() {
+                            if (!manualOverride && storyCount !== 'disable') {
+                                handleStoryCountChange(block, storyCount, true);
+                            }
                             if (!skipPreview && !isUpdateInProgress()) {
                                 setUpdateInProgress(true);
                                 setTimeout(() => {
@@ -1285,21 +1261,10 @@
                             }
                         });
                     } catch (error) {
-                        console.error('Error processing response:', error);
                         $postsContainer.html(response.data);
                         return Promise.reject(error);
                     }
-                } else {
-                    console.error('Invalid response:', response);
                 }
-            },
-            error: function(jqXHR, textStatus, errorThrown) {
-                console.error('AJAX request failed:', {
-                    status: textStatus,
-                    error: errorThrown,
-                    response: jqXHR.responseText
-                });
-                block.find('.block-posts').removeClass('loading');
             }
         });
     };
@@ -1396,3 +1361,40 @@
         window.newsletterState.pendingUpdates.delete(editorId);
     }
 })(jQuery);
+
+// Add JavaScript to handle load more functionality
+jQuery(document).ready(function($) {
+    $(document).on('click', '.load-more-posts', function() {
+        const $button = $(this);
+        const $block = $button.closest('.block-item');
+        const nextPage = parseInt($button.data('page'));
+        
+        $.ajax({
+            url: newsletterData.ajaxUrl,
+            method: 'POST',
+            data: {
+                action: 'load_block_posts',
+                security: newsletterData.nonceLoadPosts,
+                category_id: $button.data('category'),
+                block_index: $button.data('block-index'),
+                date_range: $button.data('date-range'),
+                page: nextPage
+            },
+            success: function(response) {
+                if (response.success) {
+                    const $newContent = $(response.data);
+                    $button.before($newContent.find('.sortable-posts li'));
+                    
+                    // Replace the load more button and posts count
+                    $button.replaceWith($newContent.find('.load-more-posts'));
+                    $block.find('.posts-count').replaceWith($newContent.find('.posts-count'));
+                    
+                    // Reinitialize sortable if needed
+                    if (typeof initializeSortable === 'function') {
+                        initializeSortable($block);
+                    }
+                }
+            }
+        });
+    });
+});

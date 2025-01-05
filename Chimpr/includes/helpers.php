@@ -86,6 +86,46 @@ if (!function_exists('newsletter_generate_preview_content')) {
             return '<p>Error: Invalid blocks data</p>';
         }
 
+        // Get the scheduled date for this newsletter
+        $scheduled_date = null;
+        $send_days = get_option("newsletter_send_days_$newsletter_slug", []);
+        $send_time = get_option("newsletter_send_time_$newsletter_slug", '');
+        
+        if (!empty($send_days) && !empty($send_time)) {
+            $tz = wp_timezone();
+            $now = new DateTime('now', $tz);
+            $today_day = strtolower($now->format('l'));
+            
+            // Create DateTime for today's send time
+            $time_parts = explode(':', $send_time);
+            if (count($time_parts) === 2) {
+                $send_today = (clone $now)->setTime((int)$time_parts[0], (int)$time_parts[1], 0);
+                
+                if (in_array($today_day, array_map('strtolower', $send_days)) && $send_today > $now) {
+                    $scheduled_date = $send_today;
+                } else {
+                    // Look for next scheduled day
+                    for ($i = 1; $i <= 7; $i++) {
+                        $candidate = clone $now;
+                        $candidate->modify('+' . $i . ' days');
+                        $candidate_day = strtolower($candidate->format('l'));
+                        
+                        if (in_array($candidate_day, array_map('strtolower', $send_days))) {
+                            $scheduled_date = DateTime::createFromFormat(
+                                'Y-m-d H:i',
+                                $candidate->format('Y-m-d') . ' ' . $send_time,
+                                $tz
+                            );
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Format the date or use today's date as fallback
+        $formatted_date = $scheduled_date ? $scheduled_date->format('F j, Y') : current_time('F j, Y');
+
         $available_templates = get_option('newsletter_templates', []);
         $newsletter_html = '';
 
@@ -93,7 +133,9 @@ if (!function_exists('newsletter_generate_preview_content')) {
         $header_template_id = get_option("newsletter_header_template_$newsletter_slug", '');
         if (!empty($header_template_id) && isset($available_templates[$header_template_id]) && 
             isset($available_templates[$header_template_id]['html'])) {
-            $newsletter_html .= wp_kses_post($available_templates[$header_template_id]['html']);
+            $header_html = $available_templates[$header_template_id]['html'];
+            $header_html = str_replace('{date}', $formatted_date, $header_html);
+            $newsletter_html .= wp_kses_post($header_html);
         }
 
         $newsletter_posts = get_newsletter_posts($blocks);
@@ -129,6 +171,9 @@ if (!function_exists('newsletter_generate_preview_content')) {
                     }
                 }
 
+                // Replace {date} in template content
+                $template_content = str_replace('{date}', $formatted_date, $template_content);
+
                 foreach ($block_data['posts'] as $post) {
                     $block_content = $template_content;
                     $thumbnail_url = get_the_post_thumbnail_url($post->ID, 'full');
@@ -158,12 +203,17 @@ if (!function_exists('newsletter_generate_preview_content')) {
                     }
                 }
             } elseif ($block_data['type'] === 'html' && isset($block_data['html'])) {
-                $newsletter_html .= wp_kses_post(wp_unslash($block_data['html']));
+                $html_content = wp_unslash($block_data['html']);
+                $html_content = str_replace('{date}', $formatted_date, $html_content);
+                $newsletter_html .= wp_kses_post($html_content);
             } elseif ($block_data['type'] === 'wysiwyg' && isset($block_data['wysiwyg'])) {
-                $newsletter_html .= wp_kses_post($block_data['wysiwyg']);
+                $wysiwyg_content = $block_data['wysiwyg'];
+                $wysiwyg_content = str_replace('{date}', $formatted_date, $wysiwyg_content);
+                $newsletter_html .= wp_kses_post($wysiwyg_content);
             } elseif ($block_data['type'] === 'pdf_link' && isset($block_data['html'])) {
-                // For PDF Link blocks, we treat them like HTML blocks
-                $newsletter_html .= wp_kses_post(wp_unslash($block_data['html']));
+                $pdf_content = wp_unslash($block_data['html']);
+                $pdf_content = str_replace('{date}', $formatted_date, $pdf_content);
+                $newsletter_html .= wp_kses_post($pdf_content);
             }
 
             $newsletter_html .= '</div>';
@@ -173,7 +223,9 @@ if (!function_exists('newsletter_generate_preview_content')) {
         $footer_template_id = get_option("newsletter_footer_template_$newsletter_slug", '');
         if (!empty($footer_template_id) && isset($available_templates[$footer_template_id]) && 
             isset($available_templates[$footer_template_id]['html'])) {
-            $newsletter_html .= wp_kses_post($available_templates[$footer_template_id]['html']);
+            $footer_html = $available_templates[$footer_template_id]['html'];
+            $footer_html = str_replace('{date}', $formatted_date, $footer_html);
+            $newsletter_html .= wp_kses_post($footer_html);
         }
 
         return $newsletter_html;

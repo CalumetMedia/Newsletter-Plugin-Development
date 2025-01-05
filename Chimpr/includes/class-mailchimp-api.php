@@ -65,11 +65,11 @@ class Newsletter_Mailchimp_API {
         }
 
         $recipients = ['list_id' => $list_id];
-        $target_tags = get_option("newsletter_target_tags_$newsletter_slug", []);
+        $target_tag = get_option("newsletter_target_tag_$newsletter_slug", '');
 
-        if (!empty($target_tags)) {
+        if (!empty($target_tag)) {
             $recipients['segment_opts'] = [
-                'saved_segment_id' => intval($target_tags[0])
+                'saved_segment_id' => intval($target_tag)
             ];
         }
 
@@ -118,9 +118,26 @@ class Newsletter_Mailchimp_API {
 
     public function get_list_tags($list_id) {
         if (empty($list_id)) {
-            return new WP_Error('missing_list', 'List ID is required');
+            return new WP_Error('missing_list_id', 'List ID is required.');
         }
-        return $this->make_request("lists/$list_id/tag-search");
+
+        // Debug the list ID
+        error_log('Fetching tags for list ID: ' . $list_id);
+
+        // Get all segments for the list - removed type filter to get all segments
+        $response = $this->make_request("lists/$list_id/segments", 'GET', [
+            'fields' => 'segments.id,segments.name,segments.type,segments.member_count,total_items',
+            'count' => 100,
+            'offset' => 0
+        ]);
+
+        if (is_wp_error($response)) {
+            error_log('Mailchimp API Error fetching tags: ' . $response->get_error_message());
+        } else {
+            error_log('Mailchimp API Response: ' . print_r($response, true));
+        }
+
+        return $response;
     }
 
     public function send_campaign($campaign_id) {
@@ -288,6 +305,14 @@ class Newsletter_Mailchimp_API {
             return new WP_Error('missing_campaign_id', 'No campaign ID provided.');
         }
         return $this->make_request("campaigns/$campaign_id/actions/unschedule", 'POST');
+    }
+
+    public function get_list_templates() {
+        return $this->make_request('templates', 'GET', [
+            'type' => 'user',
+            'sort_field' => 'name',
+            'sort_dir' => 'ASC'
+        ]);
     }
 
     private function make_request($endpoint, $method = 'GET', $payload = null) {

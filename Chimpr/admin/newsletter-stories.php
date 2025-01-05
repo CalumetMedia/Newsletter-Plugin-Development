@@ -219,88 +219,91 @@ wp_localize_script('newsletter-admin-js', 'newsletterData', [
                                 <td><input type="text" id="subject_line" name="subject_line" class="regular-text" value="<?php echo esc_attr(get_option("newsletter_subject_line_$newsletter_slug", '')); ?>"></td>
                             </tr>
                             <tr>
-                                <th scope="row" style="width: 120px;"><?php esc_html_e('Templates', 'newsletter'); ?></th>
-                                <td style="display: flex; gap: 20px;">
-                                    <div>
-                                        <label for="header_template"><?php esc_html_e('Header:', 'newsletter'); ?></label>
-                                        <select name="header_template" id="header_template" style="width: 200px;">
-                                            <option value=""><?php esc_html_e('-- Select Header --', 'newsletter'); ?></option>
-                                            <?php
-                                            $all_templates = get_option('newsletter_templates', []);
-                                            foreach ($all_templates as $id => $template) {
-                                                if (isset($template['type']) && $template['type'] === 'header') {
+                                <th scope="row"><?php esc_html_e('Templates', 'newsletter'); ?></th>
+                                <td>
+                                    <div style="display: flex; gap: 20px;">
+                                        <div style="flex: 1;">
+                                            <label for="header_template"><?php esc_html_e('Header:', 'newsletter'); ?></label>
+                                            <select name="header_template" id="header_template" style="width: 100%;">
+                                                <option value=""><?php esc_html_e('-- Select Header --', 'newsletter'); ?></option>
+                                                <?php
+                                                $header_template_id = get_option("newsletter_header_template_$newsletter_slug", '');
+                                                foreach ($available_templates as $template_id => $template) {
                                                     printf(
                                                         '<option value="%s" %s>%s</option>',
-                                                        esc_attr($id),
-                                                        selected(get_option("newsletter_header_template_$newsletter_slug", ''), $id, false),
+                                                        esc_attr($template_id),
+                                                        selected($header_template_id, $template_id, false),
                                                         esc_html($template['name'])
                                                     );
                                                 }
-                                            }
-                                            ?>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label for="footer_template"><?php esc_html_e('Footer:', 'newsletter'); ?></label>
-                                        <select name="footer_template" id="footer_template" style="width: 200px;">
-                                            <option value=""><?php esc_html_e('-- Select Footer --', 'newsletter'); ?></option>
-                                            <?php
-                                            foreach ($all_templates as $id => $template) {
-                                                if (isset($template['type']) && $template['type'] === 'footer') {
+                                                ?>
+                                            </select>
+                                        </div>
+                                        <div style="flex: 1;">
+                                            <label for="footer_template"><?php esc_html_e('Footer:', 'newsletter'); ?></label>
+                                            <select name="footer_template" id="footer_template" style="width: 100%;">
+                                                <option value=""><?php esc_html_e('-- Select Footer --', 'newsletter'); ?></option>
+                                                <?php
+                                                $footer_template_id = get_option("newsletter_footer_template_$newsletter_slug", '');
+                                                foreach ($available_templates as $template_id => $template) {
                                                     printf(
                                                         '<option value="%s" %s>%s</option>',
-                                                        esc_attr($id),
-                                                        selected(get_option("newsletter_footer_template_$newsletter_slug", ''), $id, false),
+                                                        esc_attr($template_id),
+                                                        selected($footer_template_id, $template_id, false),
                                                         esc_html($template['name'])
                                                     );
                                                 }
-                                            }
-                                            ?>
-                                        </select>
+                                                ?>
+                                            </select>
+                                        </div>
                                     </div>
                                 </td>
                             </tr>
-                           
                             <tr>
-    <th scope="row">
-        <?php esc_html_e('Target Tag', 'newsletter'); ?>
-    </th>
-    <td>
-        <?php
-        // Single-select approach
-        $mailchimp = new Newsletter_Mailchimp_API();
-        $list_id   = get_option('mailchimp_list_id');
-
-        // Pull the saved single tag
-        $selected_tag = get_option("newsletter_target_tag_$newsletter_slug", '');
-
-        // Fetch Mailchimp tags
-        $tags_response = $mailchimp->get_list_tags($list_id);
-
-        if (!is_wp_error($tags_response) && isset($tags_response['tags'])) {
-            echo '<select name="target_tag" id="target_tag" style="width: 100%; max-width: 420px;">';
-            echo '<option value="">-- Select a Tag --</option>';
-            
-            foreach ($tags_response['tags'] as $tag) {
-                $value   = isset($tag['id']) ? $tag['id'] : '';
-                $label   = isset($tag['name']) ? $tag['name'] : '(No Name)';
-                $isSelected = selected($selected_tag, $value, false);
-
-                printf(
-                    '<option value="%s" %s>%s</option>',
-                    esc_attr($value),
-                    $isSelected,
-                    esc_html($label)
-                );
-            }
-
-            echo '</select>';
-        } else {
-            echo '<p class="description error">' . esc_html__('Unable to fetch Mailchimp tags. Please check your API connection.', 'newsletter') . '</p>';
-        }
-        ?>
-    </td>
-</tr>
+                                <th scope="row"><?php esc_html_e('Target Segment', 'newsletter'); ?></th>
+                                <td>
+                                    <?php
+                                    $mailchimp = new Newsletter_Mailchimp_API();
+                                    $list_id = get_option('mailchimp_list_id');
+                                    $selected_segment = get_option("newsletter_target_tag_$newsletter_slug", '');
+                                    
+                                    $segments_response = $mailchimp->get_list_tags($list_id);
+                                    
+                                    // Debug output
+                                    error_log('Mailchimp Segments Response: ' . print_r($segments_response, true));
+                                    
+                                    if (!is_wp_error($segments_response) && isset($segments_response['segments'])) {
+                                        echo '<div class="segment-list" style="max-height: 200px; overflow-y: auto; border: 1px solid #ddd; padding: 10px;">';
+                                        
+                                        // Debug total count
+                                        $total_segments = count($segments_response['segments']);
+                                        error_log("Total segments found: " . $total_segments);
+                                        
+                                        foreach ($segments_response['segments'] as $segment) {
+                                            // Show all segments, not just static ones
+                                            $segment_id = esc_attr($segment['id']);
+                                            $is_selected = $selected_segment == $segment_id ? 'checked' : '';
+                                            $member_count = isset($segment['member_count']) ? " (" . $segment['member_count'] . " members)" : '';
+                                            
+                                            printf(
+                                                '<div class="segment-option" style="margin-bottom: 8px;">
+                                                    <input type="radio" name="target_tag" id="segment_%1$s" value="%1$s" %2$s>
+                                                    <label for="segment_%1$s">%3$s%4$s</label>
+                                                </div>',
+                                                $segment_id,
+                                                $is_selected,
+                                                esc_html($segment['name']),
+                                                esc_html($member_count)
+                                            );
+                                        }
+                                        
+                                        echo '</div>';
+                                    } else {
+                                        echo '<p class="description error">' . esc_html__('Unable to fetch Mailchimp segments. Please check your API connection.', 'newsletter') . '</p>';
+                                    }
+                                    ?>
+                                </td>
+                            </tr>
                             <?php
                             if (!empty($next_scheduled_text)) {
                                 echo $next_scheduled_text;
@@ -310,7 +313,7 @@ wp_localize_script('newsletter-admin-js', 'newsletterData', [
 
                         <!-- Local Buttons -->
                         <div class="local-buttons">
-                            <button type="submit" class="button button-large action-button save-button" id="save-blocks">
+                            <button type="submit" class="button button-large action-button save-button" id="save-blocks" name="save_blocks" value="1">
                                 <span class="dashicons dashicons-cloud-saved button-icon"></span>
                                 <strong><?php esc_html_e('SAVE', 'newsletter'); ?></strong>
                             </button>

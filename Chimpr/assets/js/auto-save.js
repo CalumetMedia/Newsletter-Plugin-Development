@@ -96,8 +96,14 @@
     }
 
     function autoSave() {
-        if (isSaving) {
+        // Don't auto-save if manual save is in progress
+        if (isSaving || window.manualSaveInProgress) {
             pendingChanges = true;
+            return;
+        }
+
+        // Don't auto-save if manual save was recent
+        if (window.lastManualSave && (Date.now() - window.lastManualSave) < 5000) {
             return;
         }
 
@@ -141,22 +147,42 @@
         });
     }
 
+    $('#blocks-form').on('submit', function(e) {
+        // Only handle form submission if it's from the save button
+        if ($('#save-blocks').prop('clicked')) {
+            e.preventDefault();
+            saveBlocks();
+        }
+        // Let other submit buttons (like PDF) work normally
+    });
+
+    // Track which button was clicked
+    $('#blocks-form button[type="submit"]').on('click', function() {
+        // Reset all buttons' clicked state
+        $('#blocks-form button[type="submit"]').prop('clicked', false);
+        // Set this button's clicked state
+        $(this).prop('clicked', true);
+    });
+
     window.saveBlocks = function() {
         if (isSaving) {
             return;
         }
         
+        window.manualSaveInProgress = true;
         isSaving = true;
         saveAllEditors();
         
         var blocks = collectBlockData();
         if (!blocks || !blocks.length) {
             isSaving = false;
+            window.manualSaveInProgress = false;
             return;
         }
 
         var blocksJson = JSON.stringify(blocks);
-
+        var targetTagValue = $('input[name="target_tag"]:checked').val();
+        
         var formData = new FormData();
         formData.append('action', 'save_newsletter_blocks');
         formData.append('security', newsletterData.nonceSaveBlocks);
@@ -166,6 +192,13 @@
         formData.append('header_template', $('#header_template').val());
         formData.append('footer_template', $('#footer_template').val());
         formData.append('subject_line', $('#subject_line').val());
+        
+        if (targetTagValue) {
+            formData.append('target_tag', targetTagValue);
+        }
+
+        // Set timestamp for manual save
+        window.lastManualSave = Date.now();
 
         $.ajax({
             url: newsletterData.ajaxUrl,
@@ -195,11 +228,12 @@
                     alert(response.data && response.data.message ? response.data.message : 'An error occurred while saving blocks.');
                 }
             },
-            error: function() {
+            error: function(xhr, status, error) {
                 alert('An error occurred while saving blocks. Please try again.');
             },
             complete: function() {
                 isSaving = false;
+                window.manualSaveInProgress = false;
             }
         });
     };

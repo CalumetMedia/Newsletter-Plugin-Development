@@ -110,18 +110,19 @@
         updatePreview('initial_load');
 
         // Set up direct preview updates for certain changes
-        $('#blocks-container').on('change', 
-            '.block-type, .block-template, input[name*="[show_title]"], .block-title-input, input[type="checkbox"]', 
+        $('#blocks-container').on('change',
+            '.block-type, .block-template, input[name*="[show_title]"], .block-title-input, input[type="checkbox"]',
             function() {
-            if (window.newsletterState.isReady) {
-                // Let auto-save handle the saving
-                if (typeof debouncedAutoSave === 'function') {
-                    debouncedAutoSave();
+                if (window.newsletterState.isReady) {
+                    // Let auto-save handle the saving
+                    if (typeof debouncedAutoSave === 'function') {
+                        debouncedAutoSave();
+                    }
+                    // Update preview immediately
+                    updatePreview('block_change');
                 }
-                // Update preview immediately
-                updatePreview('block_change');
             }
-        });
+        );
 
         // Handle header/footer template changes
         $('#header_template, #footer_template').on('change', function() {

@@ -1,0 +1,65 @@
+/* newsletter-phone.css */
+
+/* Phone Preview Specific Styles */
+.chimpr-phone-preview {
+    position: relative;
+    width: 444px;
+    height: 870px;
+    margin: 0 auto;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 30px;
+    overflow: hidden;
+    background-color: #000;
+}
+
+.chimpr-phone-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 444px;
+    height: 870px;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.chimpr-preview-content {
+    position: absolute;
+    top: 26px;
+    left: 33.5px;
+    width: 377px;
+    height: 818px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    background-color: #fff;
+    border-radius: 10px;
+    padding: 10px;
+    box-sizing: border-box;
+    z-index: 2;
+}
+
+.chimpr-preview-content h2 {
+    font-size: 22px;
+    text-align: center;
+    margin-bottom: 20px;
+}
+
+/* Scoped Newsletter Preview Content */
+.chimpr-preview-content .newsletter-preview * {
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+/* Phone Preview Responsive Adjustments */
+@media (max-width: 768px) {
+    .chimpr-phone-preview {
+        transform: scale(0.8);
+        transform-origin: top center;
+    }
+}
+
+@media (max-width: 480px) {
+    .chimpr-phone-preview {
+        transform: scale(0.6);
+    }
+}
+

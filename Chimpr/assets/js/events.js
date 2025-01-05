@@ -1,5 +1,8 @@
 (function($) {
 
+    /**
+     * Accordion initialization on document ready
+     */
     $(document).ready(function() {
         // Initialize jQuery UI Accordion on the blocks container
         $("#blocks-container").accordion({
@@ -10,10 +13,10 @@
         });
     });
 
-    // Remove the previous slideToggle handler for block-accordion-toggle
-    // because the accordion widget will handle expand/collapse.
-
-    // Sortable initialization for main container
+    /**
+     * Sortable for the entire #blocks-container (each .block-item)
+     * This is a higher-level container sort, not the internal post sorting.
+     */
     $(function() {
         $("#blocks-container").sortable({
             handle: '.block-drag-handle',
@@ -21,7 +24,7 @@
             axis: 'y',
             opacity: 0.7,
             start: function(event, ui) {
-                // Store the editor content before sorting starts
+                // Temporarily remove any WYSIWYG editors before sorting
                 var $editor = ui.item.find('.wysiwyg-editor-content');
                 if ($editor.length) {
                     var editorId = $editor.attr('id');
@@ -32,127 +35,99 @@
                 }
             },
             update: function(event, ui) {
+                // Reindex blocks after sorting
                 updateBlockIndices();
+                // Optionally refresh preview
                 updatePreview();
             }
         }).disableSelection();
     });
 
-    // Add Block event
+    /**
+     * Add a new block (global button).
+     * The actual addBlock() function is typically in block-manager.js.
+     */
     $(document).off('click', '#add-block').on('click', '#add-block', function() {
         addBlock();
     });
 
-    // Remove Block event
+    /**
+     * Remove a block (global event).
+     * Make sure your blocks have a `.remove-block` or `.remove-button` class
+     * if you want to handle it here, rather than in block-manager.js.
+     */
     $(document).off('click', '.remove-block').on('click', '.remove-block', function() {
         $(this).closest('.block-item').remove();
         updateBlockIndices();
         updatePreview();
     });
 
-    // Reset blocks event
-$(document).off('click', '#reset-blocks').on('click', '#reset-blocks', function(e) {
-    e.preventDefault();
-    e.stopPropagation();
+    /**
+     * Reset blocks event (clears WYSIWYG content, toggles off override, etc.)
+     */
+    $(document).off('click', '#reset-blocks').on('click', '#reset-blocks', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
 
-    var $form = $('#blocks-form');
-    var $submitButton = $(this);
+        var $form = $('#blocks-form');
+        var $submitButton = $(this);
+        $submitButton.prop('disabled', true);
 
-    // Disable to prevent double-click
-    $submitButton.prop('disabled', true);
+        $form.find('.block-item').each(function() {
+            var $block = $(this);
+            var blockIndex = $block.data('index');
+            var blockType = $block.find('.block-type').val();
 
-    $form.find('.block-item').each(function() {
-        var $block = $(this);
-        var blockIndex = $block.data('index');
-        var blockType = $block.find('.block-type').val();
-
-        // 1) WYSIWYG Blocks: Clear Editor, Title, Show Title
-        if (blockType === 'wysiwyg') {
-            // Editor ID
-            var editorId = 'wysiwyg-editor-' + blockIndex;
-
-            // Clear TinyMCE content
-            if (tinymce.get(editorId)) {
-                tinymce.get(editorId).setContent('');
-                tinymce.get(editorId).save();
+            // Clear WYSIWYG content
+            if (blockType === 'wysiwyg') {
+                var editorId = 'wysiwyg-editor-' + blockIndex;
+                if (tinymce.get(editorId)) {
+                    tinymce.get(editorId).setContent('');
+                    tinymce.get(editorId).save();
+                }
+                $block.find('textarea[name="blocks[' + blockIndex + '][wysiwyg]"]').val('');
+                $block.find('input[name="blocks[' + blockIndex + '][title]"]').val('');
+                $block.find('input[name="blocks[' + blockIndex + '][show_title]"]')
+                    .prop('checked', false)
+                    .trigger('change');
             }
 
-            // Clear raw <textarea>
-            $block.find('textarea[name="blocks[' + blockIndex + '][wysiwyg]"]').val('');
-
-            // Clear the block title
-            $block.find('input[name="blocks[' + blockIndex + '][title]"]').val('');
-
-            // Uncheck "Show Title in Preview"
-            $block.find('input[name="blocks[' + blockIndex + '][show_title]"]')
-                .prop('checked', false)
-                .trigger('change');
-        }
-
-        // 2) Content (Story) Blocks: Turn off Manual Override
-        if (blockType === 'content') {
-            $block.find('input[name="blocks[' + blockIndex + '][manual_override]"]')
-                .prop('checked', false)
-                .trigger('change');
-        }
-    });
-
-    // Build form data AFTER clearing
-    var formData = new FormData($form[0]);
-    formData.append('reset_blocks', '1');
-
-    // Send via AJAX
-    $.ajax({
-        url: $form.attr('action'),
-        type: 'POST',
-        data: formData,
-        processData: false,
-        contentType: false,
-        success: function() {
-            alert('WYSIWYG content cleared, WYSIWYG show-title off, content manual override off. Refresh to confirm.');
-        },
-        complete: function() {
-            $submitButton.prop('disabled', false);
-        }
-    });
-});
-
-
-
-    // Story count change
-    $(document).off('change.newsletter', '.block-story-count').on('change.newsletter', '.block-story-count', function() {
-        var $block = $(this).closest('.block-item');
-        var storyCount = $(this).val();
-        handleStoryCountChange($block, storyCount);
-    });
-
-    // Manual override checkbox handler
-    $(document).off('change.newsletter', '.manual-override-toggle').on('change.newsletter', '.manual-override-toggle', function() {
-        var $block = $(this).closest('.block-item');
-        var isManual = $(this).prop('checked');
-        
-        // Ensure we reinitialize sortable with the new state
-        handleManualOverrideToggle($block, isManual);
-    });
-
-    // Category/Date range change
-    $(document).off('change.newsletter', '.block-category, .block-date-range')
-        .on('change.newsletter', '.block-category, .block-date-range', function() {
-            var $block = $(this).closest('.block-item');
-            var categoryId = $block.find('.block-category').val();
-            var storyCount = $block.find('.block-story-count').val();
-            var dateRange = $block.find('.block-date-range').val() || 7;
-            var manualOverride = $block.find('input[name*="[manual_override]"]').prop('checked');
-
-            if (categoryId) {
-                loadBlockPosts($block, categoryId, $block.data('index'), dateRange, storyCount, manualOverride);
-            } else if ($(this).hasClass('block-category')) {
-                $block.find('.block-posts').html('<p>' + newsletterData.selectCategoryPrompt + '</p>');
-                updatePreview();
+            // Turn off manual override on content blocks
+            if (blockType === 'content') {
+                $block.find('input[name="blocks[' + blockIndex + '][manual_override]"]')
+                    .prop('checked', false)
+                    .trigger('change');
             }
         });
 
-    // Test email dialog
+        // Build form data AFTER clearing
+        var formData = new FormData($form[0]);
+        formData.append('reset_blocks', '1');
+
+        // Send via AJAX
+        $.ajax({
+            url: $form.attr('action'),
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function() {
+                alert('WYSIWYG content cleared, show-title off, content manual override off. Refresh to confirm.');
+            },
+            complete: function() {
+                $submitButton.prop('disabled', false);
+            }
+        });
+    });
+
+    /**
+     * (REMOVED block-story-count, manual-override-toggle, block-category, block-date-range, .block-type events)
+     * because these events are already handled in block-manager.js (setupBlockEventHandlers).
+     */
+
+    /**
+     * Test email dialog
+     */
     $(document).off('click', '#send-test-email').on('click', '#send-test-email', function(e) {
         e.preventDefault();
         $('#email-input-step').show();
@@ -161,7 +136,7 @@ $(document).off('click', '#reset-blocks').on('click', '#reset-blocks', function(
         $('#test-email-dialog').fadeIn(200);
     });
 
-    // Close test dialog
+    // Close the test-email dialog
     $(document).off('click', '#cancel-test, #close-success, .dialog-overlay')
         .on('click', '#cancel-test, #close-success, .dialog-overlay', function(e) {
             if (e.target === this) {
@@ -169,7 +144,7 @@ $(document).off('click', '#reset-blocks').on('click', '#reset-blocks', function(
             }
         });
 
-    // Send Test Email
+    // Actually send the test email
     $(document).off('click', '#send-test').on('click', '#send-test', function() {
         const testEmail = $('#test-email').val().trim();
         if (!testEmail) {
@@ -179,13 +154,17 @@ $(document).off('click', '#reset-blocks').on('click', '#reset-blocks', function(
         sendTestEmail(testEmail);
     });
 
-    // Save Blocks - allow normal form submission to trigger the redirect
+    /**
+     * Save Blocks (global button) - triggers save logic
+     */
     $(document).off('click', '#save-blocks').on('click', '#save-blocks', function(e) {
         e.preventDefault();
         saveBlocks();
     });
 
-    // Tab switching
+    /**
+     * Tab switching (navigation)
+     */
     $(document).off('click', '.nav-tab').on('click', '.nav-tab', function(e) {
         e.preventDefault();
         $('.nav-tab').removeClass('nav-tab-active');
@@ -195,18 +174,13 @@ $(document).off('click', '#reset-blocks').on('click', '#reset-blocks', function(
         localStorage.setItem('activeNewsletterTab', $(this).data('tab'));
     });
 
-    // Preview updates on input
+    // Update preview on certain form inputs
     $(document).on('input', '#custom_header, #custom_footer, .html-block textarea, .block-title-input', updatePreview);
     $(document).on('change', '.show-title-toggle, #start_date, #end_date, .block-template', updatePreview);
 
-    // Block Type Change
-    $(document).off('change', '.block-type').on('change', '.block-type', function() {
-        var block = $(this).closest('.block-item');
-        var blockType = $(this).val();
-        handleBlockTypeChange(block, blockType);
-    });
-
-    // Send to Mailchimp (create campaign)
+    /**
+     * Mailchimp flow: create campaign, schedule, etc.
+     */
     $(document).off('click', '#send-to-mailchimp').on('click', '#send-to-mailchimp', function(e) {
         e.preventDefault();
         if (!confirm('Are you sure you want to create a Mailchimp campaign with this content?')) {
@@ -215,7 +189,9 @@ $(document).off('click', '#reset-blocks').on('click', '#reset-blocks', function(
         createMailchimpCampaign($('#subject_line').val(), $('#campaign_name').val());
     });
 
-    // Manual schedule checkbox
+    /**
+     * Manual schedule: checkbox & date/time
+     */
     $(document).off('change', '#use_manual_schedule').on('change', '#use_manual_schedule', function() {
         toggleScheduleControls();
         if (this.checked) {
@@ -230,7 +206,7 @@ $(document).off('click', '#reset-blocks').on('click', '#reset-blocks', function(
         }
     });
 
-    // Save schedule settings when date/time changes
+    // Save schedule when date/time changes
     $(document).off('change', '#manual_schedule_date, #manual_schedule_time')
         .on('change', '#manual_schedule_date, #manual_schedule_time', function() {
             if ($('#use_manual_schedule').is(':checked')) {
@@ -238,7 +214,7 @@ $(document).off('click', '#reset-blocks').on('click', '#reset-blocks', function(
             }
         });
 
-    // Schedule Campaign
+    // Schedule campaign
     $(document).off('click', '#schedule-campaign').on('click', '#schedule-campaign', function() {
         var now = new Date();
         var minutes = now.getMinutes();
@@ -249,8 +225,7 @@ $(document).off('click', '#reset-blocks').on('click', '#reset-blocks', function(
         var tzoffset = now.getTimezoneOffset() * 60000;
         var localISOTime = (new Date(now - tzoffset)).toISOString().slice(0, -8);
 
-        var confirmSchedule = confirm("Are you sure you want to schedule the campaign?");
-        if (!confirmSchedule) {
+        if (!confirm("Are you sure you want to schedule the campaign?")) {
             return;
         }
 
@@ -277,12 +252,14 @@ $(document).off('click', '#reset-blocks').on('click', '#reset-blocks', function(
         });
     });
 
-    // Reinitialize sortable after AJAX content updates
+    /**
+     * After certain AJAX calls (like load_block_posts), re-initialize sorting on the newly updated blocks
+     */
     $(document).ajaxComplete(function(event, xhr, settings) {
         if (
             settings.url === newsletterData.ajaxUrl &&
             (
-                (settings.data && typeof settings.data === 'string' && settings.data.indexOf('action=load_block_posts') !== -1) ||
+                (typeof settings.data === 'string' && settings.data.indexOf('action=load_block_posts') !== -1) ||
                 (settings.data instanceof FormData && settings.data.get('action') === 'load_block_posts')
             )
         ) {

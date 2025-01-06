@@ -8,8 +8,7 @@ class Newsletter_Cron_Settings {
     }
 
     public function register_settings() {
-        // Removed newsletter_use_wp_cron references entirely
-
+        // Register settings for the "Pageview Triggered Cron" section
         register_setting('newsletter_cron_settings_group', 'newsletter_use_pageview_cron', array(
             'type' => 'boolean',
             'default' => false,
@@ -22,15 +21,22 @@ class Newsletter_Cron_Settings {
             'sanitize_callback' => 'absint',
         ));
 
+        // Add settings sections
         add_settings_section(
             'newsletter_cron_main_section',
             'Newsletter Cron Configuration',
-            function() {
-                echo '<p>Configure how and when automated newsletter sends are checked.</p>';
-            },
+            array($this, 'render_main_section_description'),
             'newsletter-cron-settings'
         );
 
+        add_settings_section(
+            'newsletter_cron_server_section',
+            'Server-Side Cron Setup (Recommended)',
+            array($this, 'render_server_section_description'),
+            'newsletter-cron-settings'
+        );
+
+        // Add settings fields
         add_settings_field(
             'newsletter_use_pageview_cron',
             'Use Pageview Triggered Cron',
@@ -57,15 +63,6 @@ class Newsletter_Cron_Settings {
             )
         );
 
-        add_settings_section(
-            'newsletter_cron_server_section',
-            'Server-Side Cron Setup (Recommended)',
-            function() {
-                echo '<p>Use a server-side cron job for better performance. The plugin checks ahead to prevent duplicates.</p>';
-            },
-            'newsletter-cron-settings'
-        );
-
         add_settings_field(
             'newsletter_cron_server_info',
             'How to Setup Server-Side Cron',
@@ -75,6 +72,16 @@ class Newsletter_Cron_Settings {
         );
     }
 
+    // Section descriptions
+    public function render_main_section_description() {
+        echo '<p>Configure how and when automated newsletter sends are checked.</p>';
+    }
+
+    public function render_server_section_description() {
+        echo '<p>Use a server-side cron job for better performance. The plugin checks ahead to prevent duplicates.</p>';
+    }
+
+    // Field renderers
     public function render_pageview_cron_field($args) {
         $option = get_option($args['option_name'], false);
         ?>
@@ -104,6 +111,7 @@ class Newsletter_Cron_Settings {
         <?php
     }
 
+    // Render the settings page
     public static function render_settings_page() {
         if (!current_user_can('manage_options')) {
             return;

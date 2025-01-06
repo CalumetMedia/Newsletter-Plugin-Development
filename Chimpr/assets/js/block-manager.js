@@ -28,68 +28,97 @@
         }
     }
 
+    // Add debug logging function at the top of the file
+    function debugLog(action, data) {
+        if (window.newsletterDebug) {
+            console.group('Newsletter Debug: ' + action);
+            console.log('Timestamp:', new Date().toISOString());
+            console.log('Data:', data);
+            console.groupEnd();
+        }
+    }
+
+    // Add debug toggle
+    window.newsletterDebug = true;
+
     // Update block indices after sorting
     window.updateBlockIndices = function() {
         // Store editor contents before reindexing
         var editorContents = {};
-        $('#blocks-container .block-item').each(function() {
-            var oldEditorId = $(this).find('.wysiwyg-editor-content').attr('id');
-            if (oldEditorId && tinymce.get(oldEditorId)) {
-                editorContents[oldEditorId] = tinymce.get(oldEditorId).getContent();
-                // Remove the editor instance
-                tinymce.execCommand('mceRemoveEditor', true, oldEditorId);
+        $('.block-item').each(function() {
+            const $block = $(this);
+            const blockIndex = $block.data('index');
+            const editorId = 'wysiwyg-editor-' + blockIndex;
+            const editor = tinymce.get(editorId);
+            
+            if (editor) {
+                editorContents[editorId] = editor.getContent();
+                debugLog('Storing editor content', {
+                    editorId: editorId,
+                    content: editorContents[editorId]
+                });
+                // Store in global state as well
+                window.newsletterState.editorContents[editorId] = editorContents[editorId];
+                editor.remove();
             }
         });
-        
-        // Update indices and names
-        $('#blocks-container .block-item').each(function(index) {
-            $(this).data('index', index);
-            $(this).find('input, select, textarea').each(function() {
-                var name = $(this).attr('name');
-                if (name) {
-                    var newName = name.replace(/blocks\[\d+\]/, 'blocks[' + index + ']');
-                    $(this).attr('name', newName);
+
+        // Update indices
+        $('.block-item').each(function(index) {
+            const $block = $(this);
+            const oldIndex = $block.data('index');
+            
+            // Update block index
+            $block.data('index', index);
+            $block.attr('data-index', index);
+            
+            // Update editor ID and name
+            const $editor = $block.find('.wysiwyg-editor-content');
+            if ($editor.length) {
+                const oldEditorId = 'wysiwyg-editor-' + oldIndex;
+                const newEditorId = 'wysiwyg-editor-' + index;
+                $editor.attr('id', newEditorId);
+                $editor.attr('name', 'blocks[' + index + '][content]');
+                
+                // Get content from both local and global state
+                const content = editorContents[oldEditorId] || window.newsletterState.editorContents[oldEditorId] || '';
+                
+                // Set the textarea value before initializing editor
+                $editor.val(content);
+                
+                if (typeof initWysiwygEditor === 'function') {
+                    debugLog('Reinitializing editor', {
+                        oldId: oldEditorId,
+                        newId: newEditorId,
+                        content: content
+                    });
                     
-                    // Update editor ID if this is a WYSIWYG textarea
-                    if ($(this).hasClass('wysiwyg-editor-content')) {
-                        var oldId = $(this).attr('id');
-                        var newId = 'wysiwyg-editor-' + index;
-                        $(this).attr('id', newId);
-                        
-                        // Initialize new editor with previous content
-                        if (oldId && editorContents[oldId]) {
-                            var content = editorContents[oldId];
-                            setTimeout(function() {
-                                wp.editor.initialize(newId, {
-                                    tinymce: {
-                                        wpautop: true,
-                                        plugins: 'paste,lists,link,textcolor,wordpress,wplink,hr,charmap,wptextpattern',
-                                        toolbar1: 'formatselect,bold,italic,bullist,numlist,link,unlink,forecolor,hr',
-                                        setup: function(editor) {
-                                            editor.on('init', function() {
-                                                editor.setContent(content);
-                                            });
-                                            editor.on('change keyup paste input', function() {
-                                                if (isUpdateInProgress()) return;
-                                                editor.save();
-                                                setUpdateInProgress(true);
-                                                setTimeout(() => {
-                                                    updatePreview('wysiwyg_content_change');
-                                                    setUpdateInProgress(false);
-                                                }, 250);
-                                            });
-                                        }
-                                    },
-                                    quicktags: true,
-                                    mediaButtons: true
-                                });
-                            }, 100);
+                    // Wait a brief moment for the DOM to settle
+                    setTimeout(() => {
+                        initWysiwygEditor(newEditorId, content);
+                        // Verify content was set correctly
+                        const newEditor = tinymce.get(newEditorId);
+                        if (newEditor) {
+                            const actualContent = newEditor.getContent();
+                            debugLog('Editor content verification', {
+                                editorId: newEditorId,
+                                expectedContent: content,
+                                actualContent: actualContent
+                            });
                         }
-                    }
+                    }, 50);
                 }
+            }
+            
+            // Update other block fields
+            $block.find('[name^="blocks[' + oldIndex + ']"]').each(function() {
+                const $field = $(this);
+                const name = $field.attr('name');
+                const newName = name.replace('blocks[' + oldIndex + ']', 'blocks[' + index + ']');
+                $field.attr('name', newName);
             });
         });
-        
+
         // Trigger preview update after reordering
         if (!isUpdateInProgress()) {
             setUpdateInProgress(true);
@@ -1360,10 +1389,67 @@
     function clearPendingUpdates(editorId) {
         window.newsletterState.pendingUpdates.delete(editorId);
     }
-})(jQuery);
 
-// Add JavaScript to handle load more functionality
-jQuery(document).ready(function($) {
+    // Initialize sortable for blocks container
+    $('#blocks-container').sortable({
+        handle: '.block-drag-handle',
+        items: '> .block-item',
+        placeholder: 'block-placeholder',
+        start: function(event, ui) {
+            debugLog('Drag Start', {
+                blockIndex: ui.item.data('index'),
+                editors: ui.item.find('.wysiwyg-editor-content').map(function() {
+                    var editorId = $(this).attr('id');
+                    var editor = tinymce.get(editorId);
+                    return {
+                        id: editorId,
+                        content: editor ? editor.getContent() : null,
+                        textareaContent: $(this).val()
+                    };
+                }).get()
+            });
+        },
+        sort: _.throttle(function(event, ui) {
+            debugLog('During Sort', {
+                blockIndex: ui.item.data('index'),
+                placeholder: {
+                    index: ui.placeholder.index()
+                }
+            });
+        }, 250), // Throttle to max 4 times per second
+        stop: function(event, ui) {
+            debugLog('Drop Complete', {
+                newIndex: ui.item.index(),
+                editors: ui.item.find('.wysiwyg-editor-content').map(function() {
+                    var editorId = $(this).attr('id');
+                    var editor = tinymce.get(editorId);
+                    return {
+                        id: editorId,
+                        content: editor ? editor.getContent() : null,
+                        textareaContent: $(this).val()
+                    };
+                }).get()
+            });
+        },
+        update: function(event, ui) {
+            // Store the content before updating indices
+            const $block = ui.item;
+            const oldIndex = $block.data('index');
+            const oldEditorId = 'wysiwyg-editor-' + oldIndex;
+            const editor = tinymce.get(oldEditorId);
+            
+            if (editor) {
+                window.newsletterState.editorContents[oldEditorId] = editor.getContent();
+            }
+            
+            // Update indices after a short delay to ensure DOM is settled
+            setTimeout(function() {
+                window.updateBlockIndices();
+            }, 100);
+        }
+    });
+
+    // Handle load more functionality
     $(document).on('click', '.load-more-posts', function() {
         const $button = $(this);
         const $block = $button.closest('.block-item');
@@ -1397,4 +1483,5 @@ jQuery(document).ready(function($) {
             }
         });
     });
-});
+
+})(jQuery);

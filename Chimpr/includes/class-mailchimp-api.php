@@ -148,12 +148,6 @@ class Newsletter_Mailchimp_API {
     }
 
     public function schedule_campaign($campaign_id, $timestamp) {
-        $this->log("Scheduling campaign", [
-            'campaign_id' => $campaign_id,
-            'timestamp' => $timestamp,
-            'formatted_local' => wp_date('Y-m-d H:i:s', $timestamp),
-        ]);
-        
         if (empty($campaign_id) || empty($timestamp)) {
             return new WP_Error('missing_params', 'Campaign ID and timestamp are required');
         }
@@ -162,24 +156,17 @@ class Newsletter_Mailchimp_API {
             // Create from Unix timestamp
             $local_dt = new DateTime("@$timestamp");
             $local_dt->setTimezone(wp_timezone());
-            
-            // Debug logging
-            error_log('Scheduling with local time: ' . $local_dt->format('Y-m-d H:i:s T'));
 
             // Convert to UTC for Mailchimp API
             $utc_dt = clone $local_dt;
             $utc_dt->setTimezone(new DateTimeZone('UTC'));
             $utc_schedule_time = $utc_dt->format('Y-m-d\TH:i:s\Z');
 
-            error_log('UTC Schedule Time: ' . $utc_schedule_time);
-
             $payload = [
                 'schedule_time' => $utc_schedule_time
             ];
 
             $response = $this->make_request("campaigns/$campaign_id/actions/schedule", 'POST', $payload);
-            error_log('Mailchimp Schedule Response: ' . print_r($response, true));
-            
             return $response;
         } catch (Exception $e) {
             error_log('Schedule Campaign Error: ' . $e->getMessage());
@@ -188,13 +175,15 @@ class Newsletter_Mailchimp_API {
     }
 
     public function get_upcoming_scheduled_campaigns($minutes_ahead = 75) {
+        // Query for both save and schedule status campaigns
         $response = $this->make_request('campaigns', 'GET', [
-            'status' => 'schedule',
-            'sort_field' => 'schedule_time',
+            'status' => 'save,schedule',
+            'sort_field' => 'send_time',
             'sort_dir' => 'ASC'
         ]);
 
         if (is_wp_error($response)) {
+            error_log("Error fetching campaigns: " . $response->get_error_message());
             return [];
         }
 
@@ -205,14 +194,21 @@ class Newsletter_Mailchimp_API {
         $upcoming = [];
         if (!empty($response['campaigns'])) {
             foreach ($response['campaigns'] as $campaign) {
-                if (!empty($campaign['settings']['schedule_time'])) {
-                    // Convert UTC schedule time to local
-                    $schedule_time = new DateTime($campaign['settings']['schedule_time']);
-                    $schedule_time->setTimezone($tz);
-                    
-                    if ($schedule_time > $now && $schedule_time <= $cutoff) {
-                        $campaign['settings']['schedule_time'] = $schedule_time->format('Y-m-d H:i:s');
-                        $upcoming[] = $campaign;
+                $schedule_time_value = !empty($campaign['send_time']) ? $campaign['send_time'] : null;
+                
+                if ($schedule_time_value) {
+                    try {
+                        $schedule_time = new DateTime($schedule_time_value);
+                        $schedule_time->setTimezone($tz);
+                        
+                        if ($schedule_time > $now && $schedule_time <= $cutoff) {
+                            $campaign['settings']['schedule_time'] = $schedule_time->format('Y-m-d H:i:s');
+                            $campaign['settings']['send_time'] = $schedule_time_value;
+                            $upcoming[] = $campaign;
+                        }
+                    } catch (Exception $e) {
+                        error_log("Error processing campaign schedule time: " . $e->getMessage());
+                        continue;
                     }
                 }
             }

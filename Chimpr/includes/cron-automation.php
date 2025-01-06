@@ -16,7 +16,7 @@ class Newsletter_Cron_Automation {
    public function __construct() {
        // Existing cron setup
        if (!wp_next_scheduled('newsletter_automated_send')) {
-           wp_schedule_event(time() + (10 * YEAR_IN_SECONDS), 'daily', 'newsletter_automated_send');
+           wp_schedule_event(time(), 'daily', 'newsletter_automated_send');
        }
 
        add_action('newsletter_automated_send', array($this, 'process_automated_send'));
@@ -72,20 +72,43 @@ class Newsletter_Cron_Automation {
 
        $mailchimp = new Newsletter_Mailchimp_API();
 
+       // Get all upcoming scheduled campaigns within our lookahead window
+       $upcoming_campaigns = $mailchimp->get_upcoming_scheduled_campaigns(self::LOOKAHEAD_MINUTES);
+       
        // Schedule campaigns for all candidate newsletters
        foreach ($candidate_newsletters as $newsletter_slug => $newsletter_data) {
-           // Fire pre-send action for PDF generation
-           do_action('pre_newsletter_automated_send', $newsletter_slug);
-           
            $newsletter_time_local = $newsletter_data['local_dt'];
            $newsletter_name = $newsletter_data['name'];
            $next_scheduled_timestamp = $newsletter_data['timestamp'];
+           $send_date_display = wp_date('F j, Y', $next_scheduled_timestamp);
+           $campaign_name = $newsletter_name . ' - ' . $send_date_display;
 
+           // Check for duplicates by comparing UTC times
+           $already_scheduled = false;
+           foreach ($upcoming_campaigns as $campaign) {
+               if (!empty($campaign['settings']['send_time'])) {
+                   $campaign_utc_time = strtotime($campaign['settings']['send_time']);
+                   $time_diff = abs($campaign_utc_time - $newsletter_time_utc->getTimestamp());
+                   
+                   if ($time_diff <= 300) { // 5 minutes buffer
+                       $already_scheduled = true;
+                       break;
+                   }
+               }
+           }
+
+           if ($already_scheduled) {
+               error_log("Skipping duplicate campaign for $newsletter_slug");
+               do_action('post_newsletter_automated_send', $newsletter_slug);
+               continue;
+           }
+
+           // Fire pre-send action for PDF generation
+           do_action('pre_newsletter_automated_send', $newsletter_slug);
+           
            $newsletter_time_utc = clone $newsletter_time_local;
            $newsletter_time_utc->setTimezone(new DateTimeZone('UTC'));
 
-           $send_date_display = wp_date('F j, Y', $next_scheduled_timestamp);
-           $campaign_name = $newsletter_name . ' - ' . $send_date_display;
            $subject_line  = get_option("newsletter_subject_line_$newsletter_slug", "Newsletter ($newsletter_slug)");
 
            $blocks = get_option("newsletter_blocks_$newsletter_slug", []);
@@ -148,7 +171,7 @@ class Newsletter_Cron_Automation {
            }
 
            $utc_schedule = $newsletter_time_utc->format('Y-m-d\TH:i:s\Z');
-           $schedule_result = $mailchimp->schedule_campaign($campaign['id'], $utc_schedule);
+           $schedule_result = $mailchimp->schedule_campaign($campaign['id'], $newsletter_data['timestamp']);
            if (is_wp_error($schedule_result)) {
                error_log("Failed to schedule campaign {$campaign['id']} for $newsletter_slug: " . $schedule_result->get_error_message());
                do_action('post_newsletter_automated_send', $newsletter_slug);
@@ -157,8 +180,6 @@ class Newsletter_Cron_Automation {
 
            // Store the campaign ID for next run
            update_option("newsletter_mailchimp_campaign_id_$newsletter_slug", $campaign['id']);
-
-           error_log("Successfully scheduled campaign {$campaign['id']} for $newsletter_slug with name '$campaign_name' at local time {$newsletter_time_local->format('Y-m-d H:i:s T')} (UTC: $utc_schedule).");
 
            // Fire post-send action for cleanup
            do_action('post_newsletter_automated_send', $newsletter_slug);

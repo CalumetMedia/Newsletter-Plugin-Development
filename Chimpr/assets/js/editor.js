@@ -6,8 +6,19 @@
             if (typeof tinymce !== 'undefined') {
                 var currentContent = '';
                 
+                // Log pre-initialization state
+                debugLog('Pre-Editor Init', {
+                    editorId: editorId,
+                    hasExistingEditor: !!tinymce.get(editorId),
+                    textareaContent: $(this).val()
+                });
+                
                 if (tinymce.get(editorId)) {
                     currentContent = tinymce.get(editorId).getContent();
+                    debugLog('Removing Existing Editor', {
+                        editorId: editorId,
+                        content: currentContent
+                    });
                     tinymce.execCommand('mceRemoveEditor', true, editorId);
                 } else {
                     currentContent = $(this).val();
@@ -32,12 +43,24 @@
                         keep_styles: true,
                         setup: function(editor) {
                             editor.on('init', function() {
+                                debugLog('Editor Initialized', {
+                                    editorId: editorId,
+                                    hasContent: !!currentContent,
+                                    contentLength: currentContent.length
+                                });
+                                
                                 if (currentContent) {
                                     if (currentContent.indexOf('<p>') === -1) {
                                         currentContent = switchEditors.wpautop(currentContent);
                                     }
                                     editor.setContent(currentContent);
                                     editor.save();
+                                    
+                                    debugLog('Content Restored', {
+                                        editorId: editorId,
+                                        restoredContent: editor.getContent(),
+                                        textareaContent: editor.getElement().value
+                                    });
                                 }
                             });
 

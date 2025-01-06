@@ -73,31 +73,52 @@
         var $submitButton = $(this);
         $submitButton.prop('disabled', true);
 
+        // First, clear all TinyMCE editors
         $form.find('.block-item').each(function() {
             var $block = $(this);
-            var blockIndex = $block.data('index');
             var blockType = $block.find('.block-type').val();
-
-            // Clear WYSIWYG content
+            
+            // Only process WYSIWYG and content blocks
             if (blockType === 'wysiwyg') {
-                var editorId = 'wysiwyg-editor-' + blockIndex;
-                if (tinymce.get(editorId)) {
-                    tinymce.get(editorId).setContent('');
-                    tinymce.get(editorId).save();
+                var $editor = $block.find('.wysiwyg-editor-content');
+                var editorId = $editor.attr('id');
+                
+                // Clear TinyMCE if it exists
+                if (tinymce && tinymce.get(editorId)) {
+                    var editor = tinymce.get(editorId);
+                    editor.setContent('');
+                    editor.save();
+                    
+                    // Force update the underlying textarea
+                    var content = editor.getContent();
+                    editor.targetElm.value = content;
                 }
-                $block.find('textarea[name="blocks[' + blockIndex + '][wysiwyg]"]').val('');
-                $block.find('input[name="blocks[' + blockIndex + '][title]"]').val('');
-                $block.find('input[name="blocks[' + blockIndex + '][show_title]"]')
-                    .prop('checked', false)
-                    .trigger('change');
-            }
+                
+                // Clear both the editor textarea and the hidden wysiwyg field
+                $editor.val('');
+                $block.find('textarea[name^="blocks"][name$="[wysiwyg]"]').val('').trigger('change');
 
-            // Turn off manual override on content blocks
-            if (blockType === 'content') {
-                $block.find('input[name="blocks[' + blockIndex + '][manual_override]"]')
+                // Clear title and show title only for WYSIWYG blocks
+                $block.find('input[name^="blocks"][name$="[title]"]').val('');
+                var $showTitle = $block.find('input[name^="blocks"][name$="[show_title]"]');
+                $showTitle.prop('checked', false);
+                setTimeout(function() {
+                    $showTitle.trigger('change');
+                }, 0);
+
+                // Force TinyMCE to sync
+                if (typeof tinyMCE !== 'undefined') {
+                    tinyMCE.triggerSave();
+                }
+            }
+            // Handle content blocks
+            else if (blockType === 'content') {
+                // Turn off manual override on content blocks
+                $block.find('input[name^="blocks"][name$="[manual_override]"]')
                     .prop('checked', false)
                     .trigger('change');
             }
+            // Skip HTML and PDF blocks - no changes needed
         });
 
         // Build form data AFTER clearing
@@ -112,7 +133,11 @@
             processData: false,
             contentType: false,
             success: function() {
-                alert('WYSIWYG content cleared, show-title off, content manual override off. Refresh to confirm.');
+                // After successful reset, trigger a save to ensure all changes are persisted
+                if (typeof saveBlocks === 'function') {
+                    saveBlocks();
+                }
+                alert('All content has been cleared. Refresh to confirm.');
             },
             complete: function() {
                 $submitButton.prop('disabled', false);
